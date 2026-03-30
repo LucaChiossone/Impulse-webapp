@@ -5,146 +5,431 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="ImpulseHIT">
+    <link rel="manifest" href="manifest.json">
     <title>IMPULSE HIT</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
-            --bg: #F2F2F7; --card-bg: #FFFFFF; --text-main: #1C1C1E; --text-muted: #8E8E93;
-            --blue: #007AFF; --green: #34C759; --red: #FF3B30; --yellow: #FFCC00; --border: #C6C6C8;
-            --safe-bottom: env(safe-area-inset-bottom, 20px);
+            --bg: #111827; --card-bg: #1f2937; --text-main: #f9fafb; --text-muted: #9ca3af;
+            --cyan: #22d3ee; --cyan-dark: #0891b2; --red: #ef4444; --amber: #f59e0b; 
+            --border: #374151; --input-bg: #374151;
+            --safe-bottom: env(safe-area-inset-bottom, 16px);
         }
-        @media (prefers-color-scheme: dark) {
-            :root { --bg: #000000; --card-bg: #1C1C1E; --text-main: #FFFFFF; --text-muted: #EBEBF599; --border: #38383A; }
-        }
-        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; font-family: -apple-system, sans-serif; }
-        body { background-color: var(--bg); color: var(--text-main); margin: 0; padding: 0; padding-bottom: calc(80px + var(--safe-bottom)); overflow-x: hidden; }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; font-family: -apple-system, sans-serif; margin: 0; padding: 0; }
+        body { background-color: var(--bg); color: var(--text-main); overflow: hidden; height: 100vh; width: 100vw; }
 
-        h1 { font-size: 34px; font-weight: 700; margin: 40px 16px 15px; letter-spacing: 0.3px; }
-        h2 { font-size: 22px; font-weight: 600; margin: 0 0 15px 0; }
+        /* App Shell Layout */
+        #app { display: flex; flex-direction: column; height: 100%; width: 100%; }
         
-        .tab-content { display: none; animation: fadeIn 0.25s ease-out; }
-        .tab-content.active { display: block; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        #top-bar { 
+            height: 56px; flex-shrink: 0; background: var(--card-bg); border-bottom: 1px solid var(--border);
+            display: flex; align-items: center; justify-content: space-between; padding: 0 16px;
+            padding-top: env(safe-area-inset-top, 0px); z-index: 40;
+        }
+        #top-bar-title { font-weight: 700; font-size: 18px; }
+        #top-bar-device { font-size: 12px; color: var(--text-muted); text-align: center; flex: 1; margin: 0 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        #top-bar-status { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; }
+        .status-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--text-muted); }
 
-        .card { background: var(--card-bg); border-radius: 16px; padding: 20px; margin: 0 16px 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
-        .btn { border: none; padding: 16px; font-size: 17px; border-radius: 14px; font-weight: 600; cursor: pointer; width: 100%; transition: 0.2s; margin-bottom: 12px; }
-        .btn-blue { background: var(--blue); color: white; }
-        .btn-green { background: var(--green); color: white; }
+        #page-content { flex: 1; overflow-y: auto; padding: 16px 16px 24px 16px; position: relative; }
+
+        #bottom-nav {
+            background: var(--bg); border-top: 1px solid var(--border);
+            display: flex; justify-content: space-around; padding-top: 8px;
+            padding-bottom: var(--safe-bottom); flex-shrink: 0; z-index: 40;
+        }
+        .nav-item { display: flex; flex-direction: column; align-items: center; justify-content: center; color: #6b7280; font-size: 10px; font-weight: 600; min-width: 60px; min-height: 44px; cursor: pointer; }
+        .nav-item.active { color: var(--cyan); }
+        .nav-item svg { width: 24px; height: 24px; margin-bottom: 4px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+        .tab-section { display: none; animation: fadeIn 0.2s ease-out; }
+        .tab-section.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* UI Components */
+        .card { background: var(--card-bg); border-radius: 12px; border: 1px solid var(--border); padding: 16px; margin-bottom: 16px; }
+        h2 { font-size: 16px; font-weight: 700; margin-bottom: 12px; color: var(--text-main); }
+        .btn { border: none; padding: 0 16px; min-height: 44px; font-size: 15px; border-radius: 8px; font-weight: 600; cursor: pointer; width: 100%; transition: 0.2s; display: flex; align-items: center; justify-content: center; margin-bottom: 12px; }
+        .btn-cyan { background: var(--cyan); color: #000; }
+        .btn-outline { background: transparent; color: var(--cyan); border: 1px solid var(--cyan); }
         .btn-red { background: var(--red); color: white; }
         .btn-gray { background: var(--border); color: var(--text-main); }
+        .btn:disabled { opacity: 0.5; pointer-events: none; }
+
+        input, select { background: var(--input-bg); color: var(--text-main); border: 1px solid var(--border); border-radius: 8px; min-height: 44px; padding: 0 12px; font-size: 15px; width: 100%; margin-bottom: 12px; appearance: none; }
+        label { font-size: 12px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; margin-bottom: 4px; display: block; }
+
+        /* Dashboard specific */
+        .chart-tabs { display: flex; gap: 8px; overflow-x: auto; margin-bottom: 12px; scrollbar-width: none; }
+        .chart-tabs::-webkit-scrollbar { display: none; }
+        .chart-pill { background: var(--bg); border: 1px solid var(--border); color: var(--text-muted); padding: 8px 16px; border-radius: 20px; font-size: 13px; font-weight: 600; white-space: nowrap; min-height: 44px; display: flex; align-items: center; }
+        .chart-pill.active { background: var(--cyan); color: #000; border-color: var(--cyan); }
         
-        .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; text-align: center; margin-bottom: 20px; }
-        .data-box { background: var(--bg); padding: 14px 5px; border-radius: 12px; }
-        .data-val { font-size: 24px; font-weight: 700; display: block; }
-        .data-lbl { font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 600; }
+        .chart-panel { height: 240px; position: relative; background: var(--card-bg); display: none; }
+        .chart-panel.active { display: block; }
 
-        #sensorBoxContainer { perspective: 800px; margin: 25px auto; width: 100px; height: 100px; }
-        #sensorBox { width: 100%; height: 100%; background: linear-gradient(135deg, var(--blue), var(--green)); border-radius: 16px; transform-style: preserve-3d; transition: transform 0.05s linear; box-shadow: 0 15px 35px rgba(0,0,0,0.3); }
+        .segment-control { display: flex; background: var(--bg); border-radius: 8px; padding: 4px; margin-bottom: 16px; }
+        .segment-btn { flex: 1; text-align: center; min-height: 36px; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600; border-radius: 6px; color: var(--text-muted); }
+        .segment-btn.active { background: var(--input-bg); color: var(--text-main); }
 
-        .alert-feed { max-height: 140px; overflow-y: auto; font-size: 13px; font-weight: 500; }
-        .alert-item { padding: 8px 12px; border-radius: 8px; margin-bottom: 8px; display: flex; justify-content: space-between;}
-        .alert-crit { background: rgba(255,59,48,0.15); color: var(--red); border: 1px solid rgba(255,59,48,0.3); }
-        .alert-warn { background: rgba(255,204,0,0.15); color: var(--yellow); border: 1px solid rgba(255,204,0,0.3); }
+        .stat-scroll { display: flex; gap: 12px; overflow-x: auto; margin-bottom: 16px; padding-bottom: 4px; scrollbar-width: none; }
+        .stat-scroll::-webkit-scrollbar { display: none; }
+        .stat-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 12px; min-width: 120px; flex-shrink: 0; display: flex; flex-direction: column; justify-content: center; }
+        .stat-val { font-size: 24px; font-weight: 800; margin-bottom: 4px; }
+        .stat-lbl { font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 600; }
 
-        input, select { background: var(--bg); color: var(--text-main); border: 1px solid var(--border); border-radius: 10px; padding: 12px; font-size: 16px; width: 100%; margin-top: 5px; margin-bottom: 10px;}
-        label { font-size: 13px; font-weight: 600; color: var(--text-muted); text-transform: uppercase;}
+        /* SVG Direction */
+        #directionSvg { display: block; margin: 0 auto; background: var(--bg); border-radius: 50%; }
         
-        .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: rgba(255, 255, 255, 0.85); height: calc(65px + var(--safe-bottom)); display: flex; justify-content: space-around; padding-top: 10px; border-top: 1px solid var(--border); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); z-index: 100; padding-bottom: var(--safe-bottom); }
-        @media (prefers-color-scheme: dark) { .bottom-nav { background: rgba(28, 28, 30, 0.85); } }
-        .nav-item { text-align: center; color: var(--text-muted); font-size: 10px; font-weight: 600; cursor: pointer; flex: 1; }
-        .nav-item.active { color: var(--blue); }
-        .nav-icon { font-size: 26px; display: block; margin-bottom: 2px; }
+        /* 3D Box */
+        #sensorBoxContainer { perspective: 800px; width: 100px; height: 100px; margin: 40px auto; }
+        #sensorBox { width: 100%; height: 100%; background: linear-gradient(135deg, var(--cyan), var(--cyan-dark)); border-radius: 12px; transform-style: preserve-3d; transition: transform 0.05s linear; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        .orientation-text { text-align: center; margin-top: 30px; font-family: monospace; color: var(--cyan); }
 
-        #debugRaw { font-family: monospace; font-size: 10px; color: var(--green); text-align: center; background: #000; padding: 5px; border-radius: 6px; overflow: hidden; white-space: nowrap; margin-top: 10px; }
+        /* Alerts */
+        .alert-feed { display: flex; flex-direction: column; gap: 8px; }
+        .alert-item { padding: 12px; border-radius: 8px; display: flex; justify-content: space-between; font-size: 13px; font-weight: 600; border: 1px solid transparent; }
+        .alert-crit { background: rgba(239, 68, 68, 0.15); color: var(--red); border-color: rgba(239, 68, 68, 0.3); }
+        .alert-warn { background: rgba(245, 158, 11, 0.15); color: var(--amber); border-color: rgba(245, 158, 11, 0.3); }
+
+        /* Overlays */
+        #critical-overlay { position: fixed; inset: 0; background: var(--red); z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 20px; display: none; }
+        #critical-val { font-size: 96px; font-weight: 900; color: white; line-height: 1; margin-bottom: 10px; }
+        #critical-lbl { font-size: 24px; font-weight: 800; color: white; text-transform: uppercase; letter-spacing: 2px; }
+        
+        #no-ble-banner { position: fixed; inset: 0; background: rgba(17, 24, 39, 0.95); z-index: 200; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; text-align: center; display: none; }
     </style>
 </head>
 <body>
 
-    <div id="tab-dash" class="tab-content active">
-        <h1>Dashboard</h1>
-        
-        <div class="card">
-            <button id="connectBtn" class="btn btn-blue">Connect Sensor</button>
-            <button id="recordBtn" class="btn btn-gray" disabled>Start Session</button>
-            <div id="status" style="font-size: 14px; color: var(--text-muted); text-align: center;">Status: Disconnected</div>
-            <div id="debugRaw">Waiting for raw data stream...</div>
-        </div>
+    <div id="no-ble-banner">
+        <h2 style="font-size: 24px; color: white; margin-bottom: 16px;">Web Bluetooth Required</h2>
+        <p style="color: var(--text-muted); margin-bottom: 32px;">Open this page in a BLE-enabled browser like Bluefy to connect to your device.</p>
+        <a href="https://apps.apple.com/us/app/bluefy-web-ble-browser/id1449286051" class="btn btn-cyan" style="text-decoration: none;">Get Bluefy on App Store</a>
+        <button class="btn btn-outline" onclick="document.getElementById('no-ble-banner').style.display='none'">Continue (View Sessions Only)</button>
+    </div>
 
-        <div class="card">
-            <div id="sensorBoxContainer"><div id="sensorBox"></div></div>
-            <div class="grid-3">
-                <div class="data-box"><span class="data-lbl">Peak G</span><span class="data-val" id="val_hx">0.0</span></div>
-                <div class="data-box"><span class="data-lbl">Temp °C</span><span class="data-val" id="val_temp">0.0</span></div>
-                <div class="data-box"><span class="data-lbl">Rows</span><span class="data-val" id="val_rows">0</span></div>
+    <div id="critical-overlay">
+        <div id="critical-val">32.4 G</div>
+        <div id="critical-lbl">Critical Impact</div>
+    </div>
+
+    <div id="app">
+        <header id="top-bar">
+            <div id="top-bar-title">Dashboard</div>
+            <div id="top-bar-device">IMPULSE</div>
+            <div id="top-bar-status">
+                <span id="bat-text">--%</span>
+                <div id="conn-dot" class="status-dot"></div>
             </div>
-            <canvas id="liveChart" height="180"></canvas>
-        </div>
+        </header>
 
-        <div class="card">
-            <h2>Live Alerts</h2>
-            <div class="alert-feed" id="alertFeed"><div style="color: var(--text-muted); text-align: center; padding: 20px;">No alerts yet.</div></div>
-        </div>
-    </div>
+        <main id="page-content" id="swipeArea">
+            
+            <div id="tab-dashboard" class="tab-section active">
+                <div class="chart-tabs">
+                    <div class="chart-pill active" onclick="switchChartTab('Gyro')">Gyroscope</div>
+                    <div class="chart-pill" onclick="switchChartTab('Impact')">Impact G</div>
+                    <div class="chart-pill" onclick="switchChartTab('Direction')">Direction</div>
+                    <div class="chart-pill" onclick="switchChartTab('Orientation')">Orientation</div>
+                </div>
 
-    <div id="tab-logs" class="tab-content">
-        <h1>Session Logs</h1>
-        <div class="card"><p style="color: var(--text-muted);">Sessions download instantly to your iOS Files app upon stopping.</p></div>
-    </div>
+                <div class="card" style="padding: 12px;">
+                    <div class="segment-control">
+                        <div id="btnLive" class="segment-btn active" onclick="setChartMode('live')">Live (10s)</div>
+                        <div id="btnFull" class="segment-btn" onclick="setChartMode('full')">Full Session</div>
+                    </div>
+                    
+                    <div id="panel-Gyro" class="chart-panel active"><canvas id="gyroChart"></canvas></div>
+                    <div id="panel-Impact" class="chart-panel"><canvas id="accelChart"></canvas></div>
+                    <div id="panel-Direction" class="chart-panel">
+                        <svg id="directionSvg" width="200" height="200" viewBox="0 0 200 200">
+                            <circle cx="100" cy="100" r="90" stroke="#374151" stroke-width="2" fill="none"/>
+                            <circle cx="100" cy="100" r="45" stroke="#374151" stroke-width="1" stroke-dasharray="4 4" fill="none"/>
+                            <text x="100" y="20" fill="#9ca3af" font-size="12" text-anchor="middle">F</text>
+                            <text x="100" y="190" fill="#9ca3af" font-size="12" text-anchor="middle">B</text>
+                            <text x="15" y="104" fill="#9ca3af" font-size="12" text-anchor="middle">L</text>
+                            <text x="185" y="104" fill="#9ca3af" font-size="12" text-anchor="middle">R</text>
+                            <text id="dir-empty" x="100" y="104" fill="#6b7280" font-size="11" text-anchor="middle">No impacts recorded</text>
+                        </svg>
+                    </div>
+                    <div id="panel-Orientation" class="chart-panel">
+                        <div id="sensorBoxContainer"><div id="sensorBox"></div></div>
+                        <div class="orientation-text" id="val_euler">P: 0° | R: 0° | Y: 0°</div>
+                    </div>
+                </div>
 
-    <div id="tab-settings" class="tab-content">
-        <h1>Device Settings</h1>
-        <div class="card" id="configPanel" style="opacity: 0.5; pointer-events: none;">
-            <label>Parameter</label>
-            <select id="configParam">
-                <option value="HG_FS">High-G Full Scale</option>
-                <option value="FF_THS">Free-fall Threshold</option>
-                <option value="TAP_THS">Tap Threshold</option>
-                <option value="LOOP_MS">Loop Delay (ms)</option>
-            </select>
-            <label>Value</label>
-            <input type="number" id="configValue" value="160">
-            <button id="sendConfigBtn" class="btn btn-green">Send to Device</button>
-            <div id="configStatus" style="font-size: 13px; color: var(--text-muted); text-align: center;">Waiting...</div>
-        </div>
-    </div>
+                <div class="stat-scroll">
+                    <div class="stat-card" id="card-peak">
+                        <span class="stat-val" id="val_hx">0.0</span>
+                        <span class="stat-lbl">Peak Impact G</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-val" id="val_gx">0</span>
+                        <span class="stat-lbl">Peak Rot °/s</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-val" id="val_temp">0.0</span>
+                        <span class="stat-lbl">Temp °C</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-val" id="val_rows">0</span>
+                        <span class="stat-lbl">Rows Rec.</span>
+                    </div>
+                </div>
 
-    <div id="tab-profile" class="tab-content">
-        <h1>Profile</h1>
-        <div class="card"><label>Athlete Name</label><input type="text" value="Demo User"><button class="btn btn-blue">Save Profile</button></div>
-    </div>
+                <div class="card">
+                    <h2>Recent Alerts</h2>
+                    <div class="alert-feed" id="alertFeed">
+                        <div style="color: var(--text-muted); text-align: center; padding: 10px; font-size: 13px;">No alerts yet.</div>
+                    </div>
+                </div>
+            </div>
 
-    <div class="bottom-nav">
-        <div class="nav-item active" onclick="switchTab('dash', this)"><span class="nav-icon">📊</span>Dash</div>
-        <div class="nav-item" onclick="switchTab('logs', this)"><span class="nav-icon">📂</span>Logs</div>
-        <div class="nav-item" onclick="switchTab('settings', this)"><span class="nav-icon">⚙️</span>Settings</div>
-        <div class="nav-item" onclick="switchTab('profile', this)"><span class="nav-icon">👤</span>Profile</div>
+            <div id="tab-bluetooth" class="tab-section">
+                <div class="card" style="text-align: center; padding: 32px 16px;">
+                    <div id="conn-big-dot" style="width: 24px; height: 24px; border-radius: 50%; background: var(--text-muted); margin: 0 auto 12px;"></div>
+                    <h2 id="conn-text" style="margin-bottom: 24px;">Disconnected</h2>
+                    <button id="connectBtn" class="btn btn-cyan">Connect to Device</button>
+                    <button id="disconnectBtn" class="btn btn-outline" style="display: none;">Disconnect</button>
+                </div>
+
+                <div id="bt-connected-area" style="display: none;">
+                    <div class="card">
+                        <h2>Battery</h2>
+                        <div style="background: var(--input-bg); height: 20px; border-radius: 10px; overflow: hidden; margin-bottom: 8px;">
+                            <div id="bat-fill" style="width: 0%; height: 100%; background: var(--cyan); transition: 0.3s;"></div>
+                        </div>
+                        <div id="bat-detail" style="font-size: 13px; color: var(--text-muted); font-weight: 600;">--% — -.-- V</div>
+                    </div>
+
+                    <div class="card" id="buffer-card" style="display: none;">
+                        <h2>Device Storage</h2>
+                        <p id="buffer-text" style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">0 rows buffered (~0 KB)</p>
+                        <button id="getSessionBtn" class="btn btn-cyan">Upload Session</button>
+                        <button id="ackSessionBtn" class="btn btn-red">Clear Buffer</button>
+                    </div>
+
+                    <div class="card">
+                        <h2>Calibration</h2>
+                        <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">Place the sensor on a flat, motionless surface.</p>
+                        <button id="calibrateBtn" class="btn btn-gray">Calibrate Gyroscope</button>
+                        <div id="calStatus" style="font-size: 12px; color: var(--cyan); margin-top: 8px; text-align: center;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="tab-device" class="tab-section">
+                <div class="card" id="configPanel" style="opacity: 0.5; pointer-events: none;">
+                    <h2>High-G Accelerometer</h2>
+                    <label>Full Scale (G)</label>
+                    <select id="cfg_hg_fs"><option value="160">±160g</option><option value="400">±400g</option></select>
+                    
+                    <h2 style="margin-top: 16px;">Low-G Accelerometer</h2>
+                    <label>Data Rate (Hz)</label>
+                    <select id="cfg_xl_odr"><option value="15">15 Hz</option><option value="60">60 Hz</option><option value="240">240 Hz</option><option value="960">960 Hz</option></select>
+                    <label>Full Scale (G)</label>
+                    <select id="cfg_xl_fs"><option value="2">±2g</option><option value="4">±4g</option><option value="8">±8g</option><option value="16">±16g</option></select>
+                    
+                    <h2 style="margin-top: 16px;">Gyroscope</h2>
+                    <label>Full Scale (dps)</label>
+                    <select id="cfg_g_fs"><option value="500">±500 dps</option><option value="1000">±1000 dps</option><option value="2000">±2000 dps</option><option value="4000">±4000 dps</option></select>
+
+                    <h2 style="margin-top: 16px;">Connection</h2>
+                    <label>Loop Delay (ms)</label>
+                    <select id="cfg_loop"><option value="100">100 ms</option><option value="250">250 ms</option><option value="500">500 ms</option></select>
+
+                    <button id="sendConfigBtn" class="btn btn-cyan" style="margin-top: 24px;">Apply to Device</button>
+                    <div id="configStatus" style="font-size: 13px; color: var(--cyan); text-align: center;">Waiting...</div>
+                </div>
+            </div>
+
+            <div id="tab-sessions" class="tab-section">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                    <h2>Recorded History</h2>
+                    <span id="sessionCountBadge" style="background: var(--input-bg); color: var(--text-main); font-size: 11px; padding: 4px 8px; border-radius: 12px; font-weight: bold;">0</span>
+                </div>
+                <div id="sessionList">
+                    <div style="color: var(--text-muted); text-align: center; padding: 20px; font-size: 14px;">Loading...</div>
+                </div>
+            </div>
+
+            <div id="tab-settings" class="tab-section">
+                <div class="card">
+                    <h2>Profile</h2>
+                    <label>Athlete Name</label>
+                    <input type="text" value="Demo User">
+                    <label>Team</label>
+                    <input type="text" value="RIT Tigers">
+                    <button class="btn btn-outline" style="margin-top: 12px;">Save Profile</button>
+                </div>
+            </div>
+
+        </main>
+
+        <nav id="bottom-nav">
+            <div class="nav-item active" onclick="switchMainTab('dashboard', this)">
+                <svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
+                <span>Dashboard</span>
+            </div>
+            <div class="nav-item" onclick="switchMainTab('bluetooth', this)">
+                <svg viewBox="0 0 24 24"><path d="m7 7 10 10-5 5V2l5 5-10 10"/></svg>
+                <span>Bluetooth</span>
+            </div>
+            <div class="nav-item" onclick="switchMainTab('device', this)">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                <span>Device</span>
+            </div>
+            <div class="nav-item" onclick="switchMainTab('sessions', this)">
+                <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/></svg>
+                <span>Sessions</span>
+            </div>
+            <div class="nav-item" onclick="switchMainTab('settings', this)">
+                <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                <span>Profile</span>
+            </div>
+        </nav>
     </div>
 
     <script>
-        function switchTab(tabId, element) {
-            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
-            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-            document.getElementById('tab-' + tabId).classList.add('active'); element.classList.add('active');
+        // --- NO BLE CHECK ---
+        if (!navigator.bluetooth) document.getElementById('no-ble-banner').style.display = 'flex';
+
+        // --- UX / NAVIGATION ---
+        let wakeLock = null;
+        const reqWakeLock = async () => { try { wakeLock = await navigator.wakeLock.request('screen'); } catch(e){} };
+        document.addEventListener('visibilitychange', async () => {
+            if (document.visibilityState === 'visible' && isConnected) {
+                reqWakeLock();
+                if (bleDevice && !bleDevice.gatt.connected) {
+                    try { await bleDevice.gatt.connect(); } catch(e) {}
+                }
+            }
+        });
+
+        const alertFeedArray = [];
+        const impactArray = []; // {x, y, r, c}
+
+        function switchMainTab(tabId, el) {
+            document.querySelectorAll('.tab-section').forEach(e => e.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(e => e.classList.remove('active'));
+            document.getElementById('tab-' + tabId).classList.add('active');
+            el.classList.add('active');
+            document.getElementById('top-bar-title').innerText = el.querySelector('span').innerText;
+            if(tabId === 'sessions') refreshSessionList();
+            if(tabId === 'dashboard') { gyroChart.resize(); accelChart.resize(); }
         }
 
+        const chartPills = ["Gyro", "Impact", "Direction", "Orientation"];
+        let activeChartIdx = 0;
+        function switchChartTab(name) {
+            activeChartIdx = chartPills.indexOf(name);
+            document.querySelectorAll('.chart-pill').forEach(e => {
+                if(e.innerText.startsWith(name)) e.classList.add('active'); else e.classList.remove('active');
+            });
+            document.querySelectorAll('.chart-panel').forEach(e => e.classList.remove('active'));
+            document.getElementById('panel-' + name).classList.add('active');
+            if(name === 'Gyro') gyroChart.resize();
+            if(name === 'Impact') accelChart.resize();
+        }
+
+        // Swipe logic
+        let touchstartX = 0; let touchendX = 0;
+        const pageContent = document.getElementById('page-content');
+        pageContent.addEventListener('touchstart', e => touchstartX = e.changedTouches[0].screenX, {passive: true});
+        pageContent.addEventListener('touchend', e => {
+            touchendX = e.changedTouches[0].screenX;
+            if (touchendX < touchstartX - 50 && activeChartIdx < 3) switchChartTab(chartPills[activeChartIdx + 1]);
+            if (touchendX > touchstartX + 50 && activeChartIdx > 0) switchChartTab(chartPills[activeChartIdx - 1]);
+        }, {passive: true});
+
+        // --- INDEXED DB ---
+        const DB_NAME = 'impulse-hit'; const DB_VERSION = 1; let db;
+        function dbOpen() {
+            return new Promise((resolve, reject) => {
+                const req = indexedDB.open(DB_NAME, DB_VERSION);
+                req.onupgradeneeded = e => { db = e.target.result;
+                    if (!db.objectStoreNames.contains('sessions')) db.createObjectStore('sessions', { keyPath: 'id' });
+                    if (!db.objectStoreNames.contains('rows')) db.createObjectStore('rows', { keyPath: ['sessionId', 'idx'] });
+                };
+                req.onsuccess = e => { db = e.target.result; resolve(db); };
+                req.onerror = e => reject(e.target.error);
+            });
+        }
+        function dbCreateSession(meta) {
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction('sessions', 'readwrite'); meta.id = crypto.randomUUID();
+                tx.objectStore('sessions').add(meta);
+                tx.oncomplete = () => resolve(meta.id); tx.onerror = e => reject(e.target.error);
+            });
+        }
+        function dbAppendRows(sessionId, startIndex, csvLines) {
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction('rows', 'readwrite'); const store = tx.objectStore('rows');
+                csvLines.forEach((line, i) => store.put({ sessionId, idx: startIndex + i, line }));
+                tx.oncomplete = () => resolve(); tx.onerror = e => reject(e.target.error);
+            });
+        }
+        function dbFinalizeSession(id, endedAt, rowCount, peakHG) {
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction('sessions', 'readwrite'); const store = tx.objectStore('sessions');
+                const getReq = store.get(id);
+                getReq.onsuccess = () => {
+                    const meta = getReq.result; if (!meta) return resolve();
+                    meta.endedAt = endedAt; meta.rowCount = rowCount; meta.peakHG = peakHG; store.put(meta);
+                };
+                tx.oncomplete = () => resolve(); tx.onerror = e => reject(e.target.error);
+            });
+        }
+        function dbListSessions() {
+            return new Promise((resolve, reject) => {
+                const req = db.transaction('sessions', 'readonly').objectStore('sessions').getAll();
+                req.onsuccess = () => resolve(req.result.sort((a,b) => new Date(b.startedAt) - new Date(a.startedAt)));
+                req.onerror = e => reject(e.target.error);
+            });
+        }
+        function dbGetSession(id) {
+            return new Promise((resolve, reject) => {
+                const req = db.transaction('sessions', 'readonly').objectStore('sessions').get(id);
+                req.onsuccess = () => resolve(req.result); req.onerror = e => reject(e.target.error);
+            });
+        }
+        function dbGetRows(sessionId) {
+            return new Promise((resolve, reject) => {
+                const idx = db.transaction('rows', 'readonly').objectStore('rows').getAll();
+                idx.onsuccess = () => resolve(idx.result.filter(r => r.sessionId === sessionId).sort((a,b) => a.idx - b.idx).map(r => r.line));
+                idx.onerror = e => reject(e.target.error);
+            });
+        }
+        function dbDeleteSession(id) {
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction(['sessions', 'rows'], 'readwrite');
+                tx.objectStore('sessions').delete(id);
+                const rStore = tx.objectStore('rows'); const req = rStore.getAll();
+                req.onsuccess = () => { req.result.filter(r => r.sessionId === id).forEach(r => rStore.delete([r.sessionId, r.idx])); };
+                tx.oncomplete = () => resolve(); tx.onerror = e => reject(e.target.error);
+            });
+        }
+        dbOpen().then(refreshSessionList);
+
+        // --- MATH & BUFFER ---
         class MadgwickAHRS {
             constructor(beta = 0.1) { this.beta = beta; this.q = [1.0, 0.0, 0.0, 0.0]; }
             update(gx, gy, gz, ax, ay, az, dt) {
                 let q0 = this.q[0], q1 = this.q[1], q2 = this.q[2], q3 = this.q[3];
                 let recipNorm = 1.0 / Math.sqrt(ax * ax + ay * ay + az * az);
-                if (!isFinite(recipNorm)) return;
-                ax *= recipNorm; ay *= recipNorm; az *= recipNorm;
+                if (!isFinite(recipNorm)) return; ax *= recipNorm; ay *= recipNorm; az *= recipNorm;
                 let s0 = 4.0 * q0 * q2 * q2 + 2.0 * q2 * ax + 4.0 * q0 * q1 * q1 - 2.0 * q1 * ay;
                 let s1 = 4.0 * q1 * q3 * q3 - 2.0 * q3 * ax + 4.0 * q0 * q0 * q1 - 2.0 * q0 * ay - 4.0 * q1 + 8.0 * q1 * q1 * q1 + 8.0 * q1 * q2 * q2 + 4.0 * q1 * az;
                 let s2 = 4.0 * q0 * q0 * q2 + 2.0 * q0 * ax + 4.0 * q2 * q3 * q3 - 2.0 * q3 * ay - 4.0 * q2 + 8.0 * q2 * q1 * q1 + 8.0 * q2 * q2 * q2 + 4.0 * q2 * az;
                 let s3 = 4.0 * q1 * q1 * q3 - 2.0 * q1 * ax + 4.0 * q2 * q2 * q3 - 2.0 * q2 * ay;
                 recipNorm = 1.0 / Math.sqrt(s0 * s0 + s1 * s1 + s2 * s2 + s3 * s3);
                 s0 *= recipNorm; s1 *= recipNorm; s2 *= recipNorm; s3 *= recipNorm;
-                let qDot1 = 0.5 * (-q1 * gx - q2 * gy - q3 * gz) - this.beta * s0;
-                let qDot2 = 0.5 * (q0 * gx + q2 * gz - q3 * gy) - this.beta * s1;
-                let qDot3 = 0.5 * (q0 * gy - q1 * gz + q3 * gx) - this.beta * s2;
-                let qDot4 = 0.5 * (q0 * gz + q1 * gy - q2 * gx) - this.beta * s3;
-                q0 += qDot1 * dt; q1 += qDot2 * dt; q2 += qDot3 * dt; q3 += qDot4 * dt;
+                q0 += (0.5 * (-q1 * gx - q2 * gy - q3 * gz) - this.beta * s0) * dt;
+                q1 += (0.5 * (q0 * gx + q2 * gz - q3 * gy) - this.beta * s1) * dt;
+                q2 += (0.5 * (q0 * gy - q1 * gz + q3 * gx) - this.beta * s2) * dt;
+                q3 += (0.5 * (q0 * gz + q1 * gy - q2 * gx) - this.beta * s3) * dt;
                 recipNorm = 1.0 / Math.sqrt(q0 * q0 + q1 * q1 + q2 * q2 + q3 * q3);
                 this.q = [q0 * recipNorm, q1 * recipNorm, q2 * recipNorm, q3 * recipNorm];
             }
@@ -154,179 +439,331 @@
             }
         }
 
-        const SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
-        const TX_CHAR_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
-        const RX_CHAR_UUID = "beb5483f-36e1-4688-b7f5-ea07361b26a8";
+        class RingBuffer {
+            constructor(maxLen = 1200) {
+                this.maxLen = maxLen; this.t = new Float64Array(maxLen);
+                this.gx = new Float64Array(maxLen); this.gy = new Float64Array(maxLen); this.gz = new Float64Array(maxLen);
+                this.hx = new Float64Array(maxLen); this.hy = new Float64Array(maxLen); this.hz = new Float64Array(maxLen);
+                this.temp = new Float64Array(maxLen);
+                this.head = 0; this.count = 0;
+                this.peakHx = 0; this.peakHy = 0; this.peakHz = 0; this.peakGx = 0; this.peakGy = 0; this.peakGz = 0;
+            }
+            append(t, gx, gy, gz, hx, hy, hz, temp) {
+                const i = this.head % this.maxLen;
+                this.t[i] = t; this.gx[i] = gx; this.gy[i] = gy; this.gz[i] = gz;
+                this.hx[i] = hx; this.hy[i] = hy; this.hz[i] = hz; this.temp[i] = temp;
+                this.head++; this.count = Math.min(this.count + 1, this.maxLen);
+                this.peakHx = Math.max(this.peakHx, Math.abs(hx)); this.peakHy = Math.max(this.peakHy, Math.abs(hy)); this.peakHz = Math.max(this.peakHz, Math.abs(hz));
+                this.peakGx = Math.max(this.peakGx, Math.abs(gx)); this.peakGy = Math.max(this.peakGy, Math.abs(gy)); this.peakGz = Math.max(this.peakGz, Math.abs(gz));
+            }
+            getOrdered() {
+                const n = this.count; if (n === 0) return null;
+                const start = n < this.maxLen ? 0 : this.head % this.maxLen;
+                const fields = ['t','gx','gy','gz','hx','hy','hz','temp']; const result = {};
+                for (const f of fields) {
+                    if (n < this.maxLen) result[f] = Array.from(this[f].subarray(0, n));
+                    else result[f] = [...Array.from(this[f].subarray(start)), ...Array.from(this[f].subarray(0, start))];
+                }
+                return result;
+            }
+            getWindow(windowS = 10) {
+                const arrays = this.getOrdered(); if (!arrays) return null;
+                const cutoff = arrays.t[arrays.t.length - 1] - windowS; const mask = arrays.t.map(v => v >= cutoff);
+                const result = {}; for (const f of Object.keys(arrays)) result[f] = arrays[f].filter((_, i) => mask[i]);
+                return result;
+            }
+            downsample(arrays, nPoints = 80) {
+                const n = arrays.t.length; if (!n || n <= nPoints) return arrays;
+                const mag2 = arrays.t.map((_, i) => ['gx','gy','gz','hx','hy','hz'].reduce((s, f) => s + arrays[f][i] ** 2, 0));
+                const bSize = n / nPoints;
+                const indices = Array.from({ length: nPoints }, (_, b) => {
+                    const start = Math.floor(b * bSize); const end = Math.min(Math.floor((b + 1) * bSize), n);
+                    let best = start; for (let i = start + 1; i < end; i++) if (mag2[i] > mag2[best]) best = i;
+                    return best;
+                });
+                const result = {}; for (const f of Object.keys(arrays)) result[f] = indices.map(i => arrays[f][i]);
+                return result;
+            }
+            reset() { this.head = 0; this.count = 0; this.peakHx = this.peakHy = this.peakHz = this.peakGx = this.peakGy = this.peakGz = 0; }
+        }
+
+        // --- GLOBAL STATE ---
+        const SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b", TX_CHAR_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8", RX_CHAR_UUID = "beb5483f-36e1-4688-b7f5-ea07361b26a8";
+        let bleDevice, bleRxCharacteristic, isConnected = false;
+        const ahrs = new MadgwickAHRS(0.1), ring = new RingBuffer(1200);
+        let lastTime = performance.now(), impactCooldown = 0;
+
+        let liveSession = { id: null, startWall: null, firstTRel: null, idx: 0, peakHG: 0 };
+        let uploadSession = { id: null, startWall: null, firstTRel: null, idx: 0, peakHG: 0 };
         
-        let bleDevice, bleRxCharacteristic;
-        const ahrs = new MadgwickAHRS(0.1);
-        let lastTime = performance.now();
+        let rxBuffer = new Uint8Array(2048), rxBufferLen = 0;
+        let xl_scale = 0.122e-3, gy_scale = 140.0e-3, hg_scale = 0.001953;
+        let gyro_bias = { x: 0, y: 0, z: 0 }; let firstTsUs = null;
+        let chartMode = 'live', rowsSinceRefresh = 0;
 
-        let isRecording = false; let sessionData = [];
-        const CSV_HEADER = "timestamp,gx_dps,gy_dps,gz_dps,hx_g,hy_g,hz_g,ax_g,ay_g,az_g,temp_C";
+        Chart.defaults.color = '#9ca3af'; Chart.defaults.borderColor = '#374151';
+        const commonOptions = { animation: false, responsive: true, maintainAspectRatio: false, elements: { point: { radius: 0 }, line: { borderWidth: 1.5 } }, plugins: { legend: { display: false } }, scales: { x: { display: true }, y: { display: true } } };
+        const gyroChart = new Chart(document.getElementById('gyroChart').getContext('2d'), { type: 'line', data: { datasets: [ { borderColor: '#ef4444', data: [] }, { borderColor: '#10b981', data: [] }, { borderColor: '#3b82f6', data: [] } ]}, options: commonOptions });
+        const accelChart = new Chart(document.getElementById('accelChart').getContext('2d'), { type: 'line', data: { datasets: [ { borderColor: '#ef4444', data: [] }, { borderColor: '#10b981', data: [] }, { borderColor: '#3b82f6', data: [] } ]}, options: commonOptions });
 
-        const ctx = document.getElementById('liveChart').getContext('2d');
-        const liveChart = new Chart(ctx, {
-            type: 'line', data: { labels: Array(50).fill(''), datasets: [ { label: 'High-G X', borderColor: '#FF3B30', data: Array(50).fill(0), tension: 0.2, pointRadius: 0 } ] },
-            options: { animation: false, scales: { x: { display: false }, y: { suggestedMin: -5, suggestedMax: 5 } }, plugins: { legend: { display: false } } }
-        });
+        function setChartMode(mode) { chartMode = mode; document.getElementById('btnLive').className = mode==='live'?'segment-btn active':'segment-btn'; document.getElementById('btnFull').className = mode==='full'?'segment-btn active':'segment-btn'; rowsSinceRefresh = 1; }
 
-        // Sensitivities ported exactly from your Python backend
-        const xl_scale = 0.122 * 1e-3;
-        const gy_scale = 140.0 * 1e-3;
-        const hg_s = 0.001953;
+        setInterval(() => {
+            if (rowsSinceRefresh === 0) return; rowsSinceRefresh = 0;
+            let data;
+            if (chartMode === 'live') { data = ring.getWindow(10); if (!data) return; const t0 = data.t[0] || 0; data.t = data.t.map(t => t - t0); } 
+            else { const ordered = ring.getOrdered(); if (!ordered) return; data = ring.downsample(ordered, 80); data.t = data.t.map(t => t / 60.0); }
+
+            gyroChart.data.datasets[0].data = data.t.map((t, i) => ({x: t, y: data.gx[i]})); gyroChart.data.datasets[1].data = data.t.map((t, i) => ({x: t, y: data.gy[i]})); gyroChart.data.datasets[2].data = data.t.map((t, i) => ({x: t, y: data.gz[i]}));
+            accelChart.data.datasets[0].data = data.t.map((t, i) => ({x: t, y: data.hx[i]})); accelChart.data.datasets[1].data = data.t.map((t, i) => ({x: t, y: data.hy[i]})); accelChart.data.datasets[2].data = data.t.map((t, i) => ({x: t, y: data.hz[i]}));
+            if(activeChartIdx === 0) gyroChart.update(); if(activeChartIdx === 1) accelChart.update();
+
+            let pkHG = Math.max(ring.peakHx, ring.peakHy, ring.peakHz);
+            document.getElementById('val_hx').innerText = pkHG.toFixed(1);
+            document.getElementById('card-peak').style.borderColor = pkHG > 25 ? 'var(--red)' : (pkHG > 15 ? 'var(--amber)' : (pkHG > 0 ? 'var(--cyan)' : 'var(--border)'));
+            document.getElementById('card-peak').querySelector('.stat-val').style.color = pkHG > 25 ? 'var(--red)' : (pkHG > 15 ? 'var(--amber)' : (pkHG > 0 ? 'var(--cyan)' : 'inherit'));
+            
+            document.getElementById('val_gx').innerText = Math.max(ring.peakGx, ring.peakGy, ring.peakGz).toFixed(0);
+            if (data.temp.length > 0) document.getElementById('val_temp').innerText = data.temp[data.temp.length - 1].toFixed(1);
+            
+            // Draw SVG
+            const svg = document.getElementById('directionSvg');
+            if(impactArray.length > 0) {
+                document.getElementById('dir-empty').style.display = 'none';
+                let html = `<circle cx="100" cy="100" r="90" stroke="#374151" stroke-width="2" fill="none"/><circle cx="100" cy="100" r="45" stroke="#374151" stroke-width="1" stroke-dasharray="4 4" fill="none"/><text x="100" y="20" fill="#9ca3af" font-size="12" text-anchor="middle">F</text><text x="100" y="190" fill="#9ca3af" font-size="12" text-anchor="middle">B</text><text x="15" y="104" fill="#9ca3af" font-size="12" text-anchor="middle">L</text><text x="185" y="104" fill="#9ca3af" font-size="12" text-anchor="middle">R</text>`;
+                impactArray.forEach(imp => html += `<circle cx="${imp.x}" cy="${imp.y}" r="${imp.r}" fill="${imp.c}"/>`);
+                svg.innerHTML = html;
+            }
+        }, 200);
+
+        function updateUIConnection(status) {
+            isConnected = status;
+            document.getElementById('conn-dot').style.background = status ? 'var(--cyan)' : 'var(--text-muted)';
+            document.getElementById('conn-big-dot').style.background = status ? 'var(--cyan)' : 'var(--text-muted)';
+            document.getElementById('conn-text').innerText = status ? 'Connected' : 'Disconnected';
+            document.getElementById('top-bar-device').style.color = status ? 'var(--cyan)' : 'var(--text-muted)';
+            
+            document.getElementById('connectBtn').style.display = status ? 'none' : 'block';
+            document.getElementById('disconnectBtn').style.display = status ? 'block' : 'none';
+            document.getElementById('bt-connected-area').style.display = status ? 'block' : 'none';
+            
+            document.getElementById('configPanel').style.opacity = status ? "1" : "0.5";
+            document.getElementById('configPanel').style.pointerEvents = status ? "auto" : "none";
+            if(status) reqWakeLock(); else if(wakeLock) { wakeLock.release(); wakeLock = null; }
+        }
 
         document.getElementById('connectBtn').addEventListener('click', async () => {
-            if (bleDevice && bleDevice.gatt.connected) { bleDevice.gatt.disconnect(); return; }
             try {
-                document.getElementById('status').innerText = "Status: Scanning...";
+                document.getElementById('conn-text').innerText = "Scanning...";
                 bleDevice = await navigator.bluetooth.requestDevice({ filters: [{ services: [SERVICE_UUID] }] });
-                
-                bleDevice.addEventListener('gattserverdisconnected', () => {
-                    document.getElementById('status').innerText = "Status: Disconnected";
-                    document.getElementById('connectBtn').innerText = "Connect Sensor";
-                    document.getElementById('connectBtn').className = "btn btn-blue";
-                    document.getElementById('recordBtn').disabled = true;
-                    if(isRecording) stopRecording();
+                bleDevice.addEventListener('gattserverdisconnected', async () => {
+                    updateUIConnection(false);
+                    if (liveSession.id) {
+                        await dbFinalizeSession(liveSession.id, new Date().toISOString(), liveSession.idx, liveSession.peakHG);
+                        liveSession.id = null; refreshSessionList();
+                    }
+                    ring.reset(); firstTsUs = null; impactArray.length = 0;
                 });
                 
                 const server = await bleDevice.gatt.connect();
                 const service = await server.getPrimaryService(SERVICE_UUID);
-                
-                // Get TX Characteristic
-                const txChar = await service.getCharacteristic(TX_CHAR_UUID);
-                await txChar.startNotifications();
-                
-                txChar.addEventListener('characteristicvaluechanged', (e) => {
-                    const data = e.target.value; // DataView object
-                    if (data.byteLength < 1) return;
-
-                    const pktType = data.getUint8(0);
-
-                    // Configuration replies (Text)
-                    if (pktType < 0xB0) {
-                        const text = new TextDecoder().decode(data.buffer);
-                        document.getElementById('debugRaw').innerText = "TXT: " + text.trim();
-                        return;
-                    }
-
-                    // Session End
-                    if (pktType === 0xB3) {
-                        if (isRecording) stopRecording();
-                        return;
-                    }
-
-                    // Live Data (0xB1) or Session Data (0xB2)
-                    if (data.byteLength < 3) return;
-                    const count = data.getUint16(1, true); // true = little-endian
-                    if (data.byteLength < 3 + (count * 24)) return;
-
-                    let offset = 3;
-                    for (let i = 0; i < count; i++) {
-                        // Unpack '<I10h' (1 uint32 + 10 int16)
-                        const ts_us = data.getUint32(offset, true); offset += 4;
-                        const ax_r = data.getInt16(offset, true); offset += 2;
-                        const ay_r = data.getInt16(offset, true); offset += 2;
-                        const az_r = data.getInt16(offset, true); offset += 2;
-                        const gx_r = data.getInt16(offset, true); offset += 2;
-                        const gy_r = data.getInt16(offset, true); offset += 2;
-                        const gz_r = data.getInt16(offset, true); offset += 2;
-                        const hx_r = data.getInt16(offset, true); offset += 2;
-                        const hy_r = data.getInt16(offset, true); offset += 2;
-                        const hz_r = data.getInt16(offset, true); offset += 2;
-                        const temp_r = data.getInt16(offset, true); offset += 2;
-
-                        // Convert to physical units
-                        const ax = ax_r * xl_scale;
-                        const ay = ay_r * xl_scale;
-                        const az = az_r * xl_scale;
-                        const gx = gx_r * gy_scale;
-                        const gy = gy_r * gy_scale;
-                        const gz = gz_r * gy_scale;
-                        const hx = hx_r * hg_s;
-                        const hy = hy_r * hg_s;
-                        const hz = hz_r * hg_s;
-                        const temp = 25.0 + temp_r / 256.0;
-
-                        // Log Session Data
-                        if (isRecording) {
-                            sessionData.push(`${new Date().toISOString()},${gx},${gy},${gz},${hx},${hy},${hz},${ax},${ay},${az},${temp}`);
-                            document.getElementById('val_rows').innerText = sessionData.length - 1;
-                        }
-
-                        // Update Visuals (Only on the last sample in the batch for UI performance)
-                        if (i === count - 1) {
-                            let peak_g = Math.max(Math.abs(hx), Math.abs(hy), Math.abs(hz));
-                            
-                            document.getElementById('debugRaw').innerText = `BIN DECODED: ${peak_g.toFixed(2)}G | ${temp.toFixed(1)}°C`;
-
-                            // Trigger Alerts
-                            if (peak_g >= 15.0 && pktType === 0xB1) {
-                                let sev = peak_g >= 25.0 ? 'crit' : 'warn';
-                                let msg = peak_g >= 25.0 ? 'Critical impact' : 'High impact';
-                                let ts = new Date().toLocaleTimeString([], {hour12: false});
-                                const feed = document.getElementById('alertFeed');
-                                if (feed.innerText.includes("No alerts yet")) feed.innerHTML = '';
-                                feed.innerHTML = `<div class="alert-item alert-${sev}"><span>${msg}: ${peak_g.toFixed(1)} G</span><span>${ts}</span></div>` + feed.innerHTML;
-                            }
-
-                            // 3D Math update
-                            let now = performance.now();
-                            let dt = (now - lastTime) / 1000.0;
-                            lastTime = now;
-                            ahrs.update(gx * (Math.PI/180), gy * (Math.PI/180), gz * (Math.PI/180), ax, ay, az, dt);
-                            
-                            let euler = ahrs.getEulerAngles();
-                            document.getElementById('sensorBox').style.transform = `rotateX(${-euler.pitch * 180/Math.PI}deg) rotateY(${euler.yaw * 180/Math.PI}deg) rotateZ(${euler.roll * 180/Math.PI}deg)`;
-
-                            document.getElementById('val_hx').innerText = peak_g.toFixed(1);
-                            document.getElementById('val_temp').innerText = temp.toFixed(1);
-
-                            liveChart.data.datasets[0].data.push(hx); liveChart.data.datasets[0].data.shift();
-                        }
-                    }
-                    liveChart.update();
-                });
-
                 bleRxCharacteristic = await service.getCharacteristic(RX_CHAR_UUID);
-                document.getElementById('status').innerText = "Status: Connected & Streaming";
-                document.getElementById('connectBtn').innerText = "Disconnect";
-                document.getElementById('connectBtn').className = "btn btn-red";
-                document.getElementById('recordBtn').disabled = false;
-                document.getElementById('configPanel').style.opacity = "1";
-                document.getElementById('configPanel').style.pointerEvents = "auto";
-            } catch (err) { document.getElementById('status').innerText = "Error: " + err.message; }
-        });
+                const txChar = await service.getCharacteristic(TX_CHAR_UUID);
+                await txChar.startNotifications(); txChar.addEventListener('characteristicvaluechanged', onNotify);
 
-        function stopRecording() {
-            if (!isRecording) return;
-            isRecording = false;
-            document.getElementById('recordBtn').innerText = "Start Session";
-            document.getElementById('recordBtn').className = "btn btn-gray";
-            const a = document.createElement('a');
-            a.href = URL.createObjectURL(new Blob([sessionData.join('\n')], { type: 'text/csv' }));
-            a.download = `impulse_session_${new Date().getTime()}.csv`;
-            a.click();
-        }
+                updateUIConnection(true);
+                ring.reset(); firstTsUs = null; impactArray.length = 0; alertFeedArray.length = 0;
+                document.getElementById('alertFeed').innerHTML = '';
+                
+                liveSession.id = await dbCreateSession({ startedAt: new Date().toISOString(), endedAt: null, rowCount: 0, deviceName: "IMPULSE", peakHG: 0, isUpload: false });
+                liveSession.startWall = new Date(); liveSession.firstTRel = null; liveSession.idx = 0; liveSession.peakHG = 0;
 
-        document.getElementById('recordBtn').addEventListener('click', () => {
-            if (isRecording) {
-                stopRecording();
-            } else {
-                isRecording = true; sessionData = [CSV_HEADER];
-                document.getElementById('recordBtn').innerText = "Stop & Save CSV";
-                document.getElementById('recordBtn').className = "btn btn-red";
-            }
+                sendCommand("GET_CONFIG"); setTimeout(() => sendCommand("GET_BATTERY"), 200);
+            } catch (err) { document.getElementById('conn-text').innerText = "Error"; }
         });
         
-        document.getElementById('sendConfigBtn').addEventListener('click', async () => {
-            if (!bleRxCharacteristic) return;
-            const command = `SET:${document.getElementById('configParam').value}:${document.getElementById('configValue').value}\n`; 
-            try {
-                await bleRxCharacteristic.writeValue(new TextEncoder().encode(command));
-                document.getElementById('configStatus').innerText = `Sent: ${command.trim()}`;
-            } catch (err) { document.getElementById('configStatus').innerText = "Failed: " + err.message; }
+        document.getElementById('disconnectBtn').addEventListener('click', () => { if(bleDevice) bleDevice.gatt.disconnect(); });
+
+        function onNotify(event) {
+            const newBytes = new Uint8Array(event.target.value.buffer);
+            if (newBytes.byteLength === 0) return;
+            const firstByte = rxBufferLen === 0 ? newBytes[0] : rxBuffer[0];
+            if (firstByte < 0xB0) {
+                const text = new TextDecoder().decode(newBytes).trim();
+                for (const line of text.split("\n")) if (line.trim()) processTextLine(line.trim());
+                return;
+            }
+            rxBuffer.set(newBytes, rxBufferLen); rxBufferLen += newBytes.byteLength;
+            while (rxBufferLen >= 3) {
+                const type = rxBuffer[0];
+                if (type === 0xB3) {
+                    if (uploadSession.id) {
+                        dbFinalizeSession(uploadSession.id, new Date().toISOString(), uploadSession.idx, uploadSession.peakHG).then(refreshSessionList);
+                        uploadSession.id = null; document.getElementById('getSessionBtn').innerText = "Upload Complete";
+                    }
+                    rxBuffer.copyWithin(0, 1); rxBufferLen -= 1; break;
+                }
+                if (type !== 0xB1 && type !== 0xB2) { rxBufferLen = 0; break; }
+                const count = rxBuffer[1] | (rxBuffer[2] << 8); const needed = 3 + count * 24;
+                if (rxBufferLen < needed) break;
+                parseBinaryPacket(new DataView(rxBuffer.buffer, 0, needed), type, count);
+                rxBuffer.copyWithin(0, needed); rxBufferLen -= needed;
+            }
+        }
+
+        function processTextLine(line) {
+            if (line.startsWith("S:")) {
+                try {
+                    const obj = JSON.parse(line.slice(2));
+                    if (obj.config) {
+                        const cfg = obj.config;
+                        if(cfg.XL_ODR) document.getElementById('cfg_xl_odr').value = cfg.XL_ODR;
+                        if(cfg.XL_FS) document.getElementById('cfg_xl_fs').value = cfg.XL_FS;
+                        if(cfg.G_FS) document.getElementById('cfg_g_fs').value = cfg.G_FS;
+                        if(cfg.HG_FS) document.getElementById('cfg_hg_fs').value = cfg.HG_FS;
+                        if(cfg.LOOP_MS) document.getElementById('cfg_loop').value = cfg.LOOP_MS;
+                    }
+                    if (obj.battery !== undefined) {
+                        const pct = Math.min(100, Math.max(0, obj.battery));
+                        document.getElementById('bat-text').innerText = pct + '%';
+                        document.getElementById('bat-detail').innerText = `${pct}% — ${obj.vbat} V`;
+                        document.getElementById('bat-fill').style.width = pct + '%';
+                        document.getElementById('bat-fill').style.background = pct > 40 ? 'var(--cyan)' : (pct > 15 ? 'var(--amber)' : 'var(--red)');
+                    }
+                    if (obj.session_pending !== undefined) {
+                        document.getElementById('buffer-card').style.display = obj.rows > 0 ? 'block' : 'none';
+                        document.getElementById('buffer-text').innerText = `${obj.rows} rows buffered (~${Math.round((obj.rows*24)/1024)} KB)`;
+                    }
+                } catch(e) {}
+            } else if (line.startsWith("H_BIN:")) {
+                try {
+                    const hdr = JSON.parse(line.slice(6));
+                    xl_scale = hdr.xl_s * 0.001; gy_scale = hdr.gy_s * 0.001; hg_scale = hdr.hg_s; 
+                    if(hdr.gx_b !== undefined) gyro_bias = { x: hdr.gx_b, y: hdr.gy_b, z: hdr.gz_b };
+                } catch(e) {}
+            } else if (line.startsWith("CAL:")) {
+                const parts = line.slice(4).split(",");
+                document.getElementById('calStatus').innerText = `Bias: ${parseFloat(parts[0]).toFixed(1)}, ${parseFloat(parts[1]).toFixed(1)}, ${parseFloat(parts[2]).toFixed(1)}`;
+            }
+        }
+
+        function triggerOverlay(peak) {
+            navigator.vibrate?.([100, 50, 100, 50, 200]);
+            const ov = document.getElementById('critical-overlay');
+            document.getElementById('critical-val').innerText = peak.toFixed(1) + " G";
+            ov.style.display = 'flex'; setTimeout(() => ov.style.display = 'none', 2500);
+        }
+
+        function parseBinaryPacket(data, pktType, count) {
+            let offset = 3, liveBatch = [], uploadBatch = [];
+            for (let i = 0; i < count; i++) {
+                const ts_us = data.getUint32(offset, true); offset += 4;
+                if (firstTsUs === null) firstTsUs = ts_us; const t_rel = (ts_us - firstTsUs) / 1000000.0;
+                const ax = data.getInt16(offset, true) * xl_scale; offset += 2;
+                const ay = data.getInt16(offset, true) * xl_scale; offset += 2;
+                const az = data.getInt16(offset, true) * xl_scale; offset += 2;
+                const gx = (data.getInt16(offset, true) * gy_scale) - gyro_bias.x; offset += 2;
+                const gy = (data.getInt16(offset, true) * gy_scale) - gyro_bias.y; offset += 2;
+                const gz = (data.getInt16(offset, true) * gy_scale) - gyro_bias.z; offset += 2;
+                const hx = data.getInt16(offset, true) * hg_scale; offset += 2;
+                const hy = data.getInt16(offset, true) * hg_scale; offset += 2;
+                const hz = data.getInt16(offset, true) * hg_scale; offset += 2;
+                const temp = 25.0 + data.getInt16(offset, true) / 256.0; offset += 2;
+
+                let peak_g = Math.max(Math.abs(hx), Math.abs(hy), Math.abs(hz));
+
+                if (pktType === 0xB1 || pktType === 0xB2) { ring.append(t_rel, gx, gy, gz, hx, hy, hz, temp); rowsSinceRefresh++; }
+
+                // Alert & Impacts (Live only)
+                if (pktType === 0xB1) {
+                    if (impactCooldown > 0) impactCooldown--;
+                    let mag = Math.sqrt(hx*hx + hy*hy + hz*hz);
+                    if (mag >= 2.0 && impactCooldown === 0) {
+                        let ang = Math.atan2(-hy, hx); // hy=forward -> UP
+                        let r = Math.min(mag/25, 0.9) * 90;
+                        impactArray.push({ x: 100 + r * Math.cos(ang), y: 100 + r * Math.sin(ang), r: 4 + mag*0.3, c: mag>25?'#ef4444':(mag>15?'#f59e0b':'#facc15') });
+                        impactCooldown = 10;
+                    }
+
+                    if (peak_g >= 15.0) {
+                        let sev = peak_g >= 25.0 ? 'crit' : 'warn';
+                        let msg = peak_g >= 25.0 ? 'Critical' : 'High';
+                        if(peak_g >= 25.0) triggerOverlay(peak_g); else navigator.vibrate?.([80]);
+                        
+                        alertFeedArray.unshift(`<div class="alert-item alert-${sev}"><span>${msg} Impact</span><span>${peak_g.toFixed(1)} G</span></div>`);
+                        if(alertFeedArray.length > 5) alertFeedArray.pop();
+                        document.getElementById('alertFeed').innerHTML = alertFeedArray.join('');
+                    }
+                }
+
+                const formatRow = (wStart, fT) => `${new Date(wStart.getTime() + (t_rel - fT) * 1000).toISOString()},${t_rel.toFixed(4)},${gx.toFixed(4)},${gy.toFixed(4)},${gz.toFixed(4)},${hx.toFixed(4)},${hy.toFixed(4)},${hz.toFixed(4)},${ax.toFixed(4)},${ay.toFixed(4)},${az.toFixed(4)},${temp.toFixed(2)}`;
+
+                if (pktType === 0xB1 && liveSession.id) {
+                    if (liveSession.firstTRel === null) liveSession.firstTRel = t_rel;
+                    liveBatch.push(formatRow(liveSession.startWall, liveSession.firstTRel));
+                    liveSession.peakHG = Math.max(liveSession.peakHG, peak_g);
+                    document.getElementById('val_rows').innerText = liveSession.idx + liveBatch.length;
+                }
+                if (pktType === 0xB2 && uploadSession.id) {
+                    if (uploadSession.firstTRel === null) uploadSession.firstTRel = t_rel;
+                    uploadBatch.push(formatRow(uploadSession.startWall, uploadSession.firstTRel));
+                    uploadSession.peakHG = Math.max(uploadSession.peakHG, peak_g);
+                }
+
+                if (i === count - 1) { 
+                    let now = performance.now(); let dt = (now - lastTime) / 1000.0; lastTime = now;
+                    ahrs.update(gx * (Math.PI/180), gy * (Math.PI/180), gz * (Math.PI/180), ax, ay, az, dt);
+                    let euler = ahrs.getEulerAngles();
+                    let pDeg = (-euler.pitch * 180/Math.PI).toFixed(0);
+                    let rDeg = (euler.roll * 180/Math.PI).toFixed(0);
+                    let yDeg = (euler.yaw * 180/Math.PI).toFixed(0);
+                    document.getElementById('val_euler').innerText = `P: ${pDeg}° | R: ${rDeg}° | Y: ${yDeg}°`;
+                    document.getElementById('sensorBox').style.transform = `rotateX(${pDeg}deg) rotateY(${yDeg}deg) rotateZ(${rDeg}deg)`;
+                }
+            }
+            if (liveBatch.length > 0) { dbAppendRows(liveSession.id, liveSession.idx, liveBatch); liveSession.idx += liveBatch.length; }
+            if (uploadBatch.length > 0) { dbAppendRows(uploadSession.id, uploadSession.idx, uploadBatch); uploadSession.idx += uploadBatch.length; }
+        }
+
+        async function sendCommand(cmd) { if (bleRxCharacteristic) { try { await bleRxCharacteristic.writeValue(new TextEncoder().encode(cmd + "\n")); } catch (err) {} } }
+        
+        document.getElementById('sendConfigBtn').addEventListener('click', () => {
+            const payload = { XL_ODR: Number(document.getElementById('cfg_xl_odr').value), XL_FS: Number(document.getElementById('cfg_xl_fs').value), G_FS: Number(document.getElementById('cfg_g_fs').value), HG_FS: Number(document.getElementById('cfg_hg_fs').value), LOOP_MS: Number(document.getElementById('cfg_loop').value) };
+            sendCommand(`SET_CONFIG:${JSON.stringify(payload)}`);
+            document.getElementById('configStatus').innerText = "✓ Applied"; setTimeout(()=>document.getElementById('configStatus').innerText="", 2000);
         });
+        document.getElementById('getConfigBtn').addEventListener('click', () => sendCommand("GET_CONFIG"));
+        document.getElementById('calibrateBtn').addEventListener('click', () => { sendCommand("CALIBRATE"); document.getElementById('calStatus').innerText = "Hold device still..."; });
+        document.getElementById('ackSessionBtn').addEventListener('click', () => { if(confirm("Clear device memory?")) sendCommand("SESSION_ACK"); });
+
+        document.getElementById('getSessionBtn').addEventListener('click', async () => {
+            uploadSession.id = await dbCreateSession({ startedAt: new Date().toISOString(), endedAt: null, rowCount: 0, deviceName: "IMPULSE", peakHG: 0, isUpload: true });
+            uploadSession.startWall = new Date(); uploadSession.firstTRel = null; uploadSession.idx = 0; uploadSession.peakHG = 0;
+            document.getElementById('getSessionBtn').innerText = "Receiving..."; sendCommand("GET_SESSION");
+        });
+
+        async function refreshSessionList() {
+            const listDiv = document.getElementById('sessionList'); const sessions = await dbListSessions();
+            document.getElementById('sessionCountBadge').innerText = sessions.length;
+            if (sessions.length === 0) { listDiv.innerHTML = `<div style="color: var(--text-muted); text-align: center; padding: 20px; font-size: 14px;">No sessions yet.</div>`; return; }
+            listDiv.innerHTML = '';
+            sessions.forEach(s => {
+                const sDate = new Date(s.startedAt); const niceDate = sDate.toLocaleDateString(undefined, {month:'short', day:'numeric'}) + " " + sDate.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+                let durStr = "Ongoing..."; if (s.endedAt) { const sec = Math.round((new Date(s.endedAt) - sDate) / 1000); durStr = `${Math.floor(sec/60)}m ${sec%60}s`; }
+                const card = document.createElement('div'); card.className = "card"; card.style.padding = "12px"; card.style.marginBottom = "12px";
+                card.innerHTML = `<div style="display:flex; justify-content:space-between; margin-bottom:8px;"><b style="font-size:15px;">${niceDate}</b>${s.isUpload ? '<span style="background:var(--cyan);color:#000;font-size:10px;padding:2px 6px;border-radius:4px;font-weight:bold;">UPLOAD</span>' : ''}</div><div style="font-size:13px; color:var(--text-muted); margin-bottom:12px;">Duration: ${durStr} • Rows: ${s.rowCount||0}<br>Peak: <span style="color:${(s.peakHG||0)>25?'var(--red)':((s.peakHG||0)>15?'var(--amber)':'var(--cyan)')}; font-weight:bold;">${(s.peakHG||0).toFixed(1)} G</span></div><div style="display:flex; gap:8px;"><button class="btn btn-outline" style="min-height:36px; font-size:13px; margin:0;" onclick="exportSession('${s.id}')">Export CSV</button><button class="btn btn-red" style="min-height:36px; font-size:13px; margin:0; flex:0.4;" onclick="deleteSessionUI('${s.id}')">Delete</button></div>`;
+                listDiv.appendChild(card);
+            });
+        }
+
+        async function exportSession(id) {
+            const rows = await dbGetRows(id); const meta = await dbGetSession(id);
+            const blob = new Blob(["wall_time,t_rel,gx_dps,gy_dps,gz_dps,hx_g,hy_g,hz_g,ax_g,ay_g,az_g,temp_C\n" + rows.join("\n")], { type: "text/csv;charset=utf-8;" });
+            const fn = `${meta.isUpload?"upload":"log"}_${meta.startedAt.replace(/[:.]/g,"-").slice(0,19)}.csv`;
+            if (navigator.share && navigator.canShare) { const file = new File([blob], fn, { type: "text/csv" }); if (navigator.canShare({ files: [file] })) return navigator.share({ files: [file], title: "IMPULSE HIT Session" }); }
+            const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = fn; a.click(); setTimeout(() => URL.revokeObjectURL(url), 30000);
+        }
+        async function deleteSessionUI(id) { if(confirm("Delete session?")) { await dbDeleteSession(id); refreshSessionList(); } }
     </script>
 </body>
 </html>
