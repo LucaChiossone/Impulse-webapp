@@ -66,7 +66,7 @@
         .chart-pill { background: var(--bg); border: 1px solid var(--border); color: var(--text-muted); padding: 8px 16px; border-radius: 20px; font-size: 13px; font-weight: 600; white-space: nowrap; min-height: 44px; display: flex; align-items: center; }
         .chart-pill.active { background: var(--cyan); color: #000; border-color: var(--cyan); }
         
-        .chart-panel { height: 240px; position: relative; background: var(--card-bg); display: none; }
+        .chart-panel { display: none; }
         .chart-panel.active { display: block; }
 
         .segment-control { display: flex; background: var(--bg); border-radius: 8px; padding: 4px; margin-bottom: 16px; }
@@ -141,22 +141,34 @@
                         <div id="btnFull" class="segment-btn" onclick="setChartMode('full')">Full Session</div>
                     </div>
                     
-                    <div id="panel-Gyro" class="chart-panel active"><canvas id="gyroChart"></canvas></div>
-                    <div id="panel-Impact" class="chart-panel"><canvas id="accelChart"></canvas></div>
+                    <div id="panel-Gyro" class="chart-panel active">
+                        <div class="chart-container" style="position:relative; height:220px; width:100%;">
+                            <canvas id="gyroChart"></canvas>
+                        </div>
+                    </div>
+                    <div id="panel-Impact" class="chart-panel">
+                        <div class="chart-container" style="position:relative; height:220px; width:100%;">
+                            <canvas id="accelChart"></canvas>
+                        </div>
+                    </div>
                     <div id="panel-Direction" class="chart-panel">
-                        <svg id="directionSvg" width="200" height="200" viewBox="0 0 200 200">
-                            <circle cx="100" cy="100" r="90" stroke="#374151" stroke-width="2" fill="none"/>
-                            <circle cx="100" cy="100" r="45" stroke="#374151" stroke-width="1" stroke-dasharray="4 4" fill="none"/>
-                            <text x="100" y="20" fill="#9ca3af" font-size="12" text-anchor="middle">F</text>
-                            <text x="100" y="190" fill="#9ca3af" font-size="12" text-anchor="middle">B</text>
-                            <text x="15" y="104" fill="#9ca3af" font-size="12" text-anchor="middle">L</text>
-                            <text x="185" y="104" fill="#9ca3af" font-size="12" text-anchor="middle">R</text>
-                            <text id="dir-empty" x="100" y="104" fill="#6b7280" font-size="11" text-anchor="middle">No impacts recorded</text>
-                        </svg>
+                        <div style="position:relative; height:220px; display:flex; align-items:center; justify-content:center;">
+                            <svg id="directionSvg" width="200" height="200" viewBox="0 0 200 200">
+                                <circle cx="100" cy="100" r="90" stroke="#374151" stroke-width="2" fill="none"/>
+                                <circle cx="100" cy="100" r="45" stroke="#374151" stroke-width="1" stroke-dasharray="4 4" fill="none"/>
+                                <text x="100" y="20" fill="#9ca3af" font-size="12" text-anchor="middle">F</text>
+                                <text x="100" y="190" fill="#9ca3af" font-size="12" text-anchor="middle">B</text>
+                                <text x="15" y="104" fill="#9ca3af" font-size="12" text-anchor="middle">L</text>
+                                <text x="185" y="104" fill="#9ca3af" font-size="12" text-anchor="middle">R</text>
+                                <text id="dir-empty" x="100" y="104" fill="#6b7280" font-size="11" text-anchor="middle">No impacts recorded</text>
+                            </svg>
+                        </div>
                     </div>
                     <div id="panel-Orientation" class="chart-panel">
-                        <div id="sensorBoxContainer"><div id="sensorBox"></div></div>
-                        <div class="orientation-text" id="val_euler">P: 0° | R: 0° | Y: 0°</div>
+                        <div style="position:relative; height:220px; overflow:hidden;">
+                            <div id="sensorBoxContainer"><div id="sensorBox"></div></div>
+                            <div class="orientation-text" id="val_euler">P: 0° | R: 0° | Y: 0°</div>
+                        </div>
                     </div>
                 </div>
 
@@ -224,7 +236,7 @@
                 <div class="card" id="configPanel" style="opacity: 0.5; pointer-events: none;">
                     <h2>High-G Accelerometer</h2>
                     <label>Full Scale (G)</label>
-                    <select id="cfg_hg_fs"><option value="160">±160g</option><option value="400">±400g</option></select>
+                    <select id="cfg_hg_fs"><option value="64">±64g</option><option value="320">±320g</option></select>
                     
                     <h2 style="margin-top: 16px;">Low-G Accelerometer</h2>
                     <label>Data Rate (Hz)</label>
@@ -309,7 +321,7 @@
         });
 
         const alertFeedArray = [];
-        const impactArray = []; // {x, y, r, c}
+        const impactArray = [];
 
         function switchMainTab(tabId, el) {
             document.querySelectorAll('.tab-section').forEach(e => e.classList.remove('active'));
@@ -502,7 +514,20 @@
         let chartMode = 'live', rowsSinceRefresh = 0;
 
         Chart.defaults.color = '#9ca3af'; Chart.defaults.borderColor = '#374151';
-        const commonOptions = { animation: false, responsive: true, maintainAspectRatio: false, elements: { point: { radius: 0 }, line: { borderWidth: 1.5 } }, plugins: { legend: { display: false } }, scales: { x: { display: true }, y: { display: true } } };
+        
+        // BUG 2 FIX: Ensure maintainAspectRatio is false and initial limits are set
+        const commonOptions = { 
+            animation: false, 
+            responsive: true, 
+            maintainAspectRatio: false, 
+            elements: { point: { radius: 0 }, line: { borderWidth: 1.5 } }, 
+            plugins: { legend: { display: false } }, 
+            scales: { 
+                x: { type: 'linear', min: 0, max: 10, display: true }, 
+                y: { display: true } 
+            } 
+        };
+        
         const gyroChart = new Chart(document.getElementById('gyroChart').getContext('2d'), { type: 'line', data: { datasets: [ { borderColor: '#ef4444', data: [] }, { borderColor: '#10b981', data: [] }, { borderColor: '#3b82f6', data: [] } ]}, options: commonOptions });
         const accelChart = new Chart(document.getElementById('accelChart').getContext('2d'), { type: 'line', data: { datasets: [ { borderColor: '#ef4444', data: [] }, { borderColor: '#10b981', data: [] }, { borderColor: '#3b82f6', data: [] } ]}, options: commonOptions });
 
@@ -510,13 +535,44 @@
 
         setInterval(() => {
             if (rowsSinceRefresh === 0) return; rowsSinceRefresh = 0;
+            
             let data;
-            if (chartMode === 'live') { data = ring.getWindow(10); if (!data) return; const t0 = data.t[0] || 0; data.t = data.t.map(t => t - t0); } 
-            else { const ordered = ring.getOrdered(); if (!ordered) return; data = ring.downsample(ordered, 80); data.t = data.t.map(t => t / 60.0); }
+            let isFull = (chartMode === 'full');
+            
+            if (!isFull) { 
+                data = ring.getWindow(10); 
+            } else { 
+                const ordered = ring.getOrdered(); 
+                if (ordered) data = ring.downsample(ordered, 80); 
+            }
 
-            gyroChart.data.datasets[0].data = data.t.map((t, i) => ({x: t, y: data.gx[i]})); gyroChart.data.datasets[1].data = data.t.map((t, i) => ({x: t, y: data.gy[i]})); gyroChart.data.datasets[2].data = data.t.map((t, i) => ({x: t, y: data.gz[i]}));
-            accelChart.data.datasets[0].data = data.t.map((t, i) => ({x: t, y: data.hx[i]})); accelChart.data.datasets[1].data = data.t.map((t, i) => ({x: t, y: data.hy[i]})); accelChart.data.datasets[2].data = data.t.map((t, i) => ({x: t, y: data.hz[i]}));
-            if(activeChartIdx === 0) gyroChart.update(); if(activeChartIdx === 1) accelChart.update();
+            if (!data || data.t.length < 2) return;
+
+            // BUG 1 FIX: Explicitly set axis min and max to track the rolling window
+            const tArr = isFull ? data.t.map(t => t / 60.0) : data.t;
+            const xMin = tArr[0];
+            const xMax = tArr[tArr.length - 1];
+            const xPad = (xMax - xMin) * 0.02 || 0.1;
+
+            gyroChart.data.datasets[0].data = tArr.map((t, i) => ({x: t, y: data.gx[i]})); 
+            gyroChart.data.datasets[1].data = tArr.map((t, i) => ({x: t, y: data.gy[i]})); 
+            gyroChart.data.datasets[2].data = tArr.map((t, i) => ({x: t, y: data.gz[i]}));
+            gyroChart.options.scales.x.min = xMin - xPad;
+            gyroChart.options.scales.x.max = xMax + xPad;
+            gyroChart.options.scales.x.title = { display: true, text: isFull ? 'Time (min)' : 'Time (s)', color: '#9ca3af' };
+            
+            accelChart.data.datasets[0].data = tArr.map((t, i) => ({x: t, y: data.hx[i]})); 
+            accelChart.data.datasets[1].data = tArr.map((t, i) => ({x: t, y: data.hy[i]})); 
+            accelChart.data.datasets[2].data = tArr.map((t, i) => ({x: t, y: data.hz[i]}));
+            accelChart.options.scales.x.min = xMin - xPad;
+            accelChart.options.scales.x.max = xMax + xPad;
+            accelChart.options.scales.x.title = { display: true, text: isFull ? 'Time (min)' : 'Time (s)', color: '#9ca3af' };
+            
+            // BUG 1 FIX: 'none' bypasses animation causing lag/dotting
+            if(activeChartIdx === 0) gyroChart.update('none'); 
+            if(activeChartIdx === 1) accelChart.update('none');
+
+            // console.log('ring count:', ring.count, 'tRange:', data?.t?.length);
 
             let pkHG = Math.max(ring.peakHx, ring.peakHy, ring.peakHz);
             document.getElementById('val_hx').innerText = pkHG.toFixed(1);
