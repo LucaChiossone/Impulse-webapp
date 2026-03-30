@@ -192,23 +192,37 @@
                 const txChar = await service.getCharacteristic(TX_CHAR_UUID);
                 await txChar.startNotifications();
                 
-                txChar.addEventListener('characteristicvaluechanged', (e) => {
-                    dataBuffer += new TextDecoder().decode(e.target.value);
-                    let lines = dataBuffer.split('\n');
-                    
-                    // FIX #1: Process EVERY complete line, not just the last one
-                    if (lines.length > 1) {
-                        dataBuffer = lines.pop(); // Keep the incomplete part
-                        for (let line of lines) {
-                            let cleanLine = line.trim();
-                            if(cleanLine.length > 0) {
-                                document.getElementById('debugRaw').innerText = cleanLine; // Output to UI
-                                parseFirmwareLine(cleanLine);
-                            }
-                        }
-                        liveChart.update(); // Update chart once per chunk
-                    }
-                });
+txChar.addEventListener('characteristicvaluechanged', (e) => {
+    const value = e.target.value;
+    
+    // 1. Safely extract raw bytes (Bypasses Bluefy TextDecoder bugs)
+    let rawHex = "";
+    let safeAscii = "";
+    for (let i = 0; i < value.byteLength; i++) {
+        let byte = value.getUint8(i);
+        rawHex += byte.toString(16).padStart(2, '0') + " ";
+        // Only convert printable ASCII characters to text, otherwise show a dot
+        safeAscii += (byte >= 32 && byte <= 126) ? String.fromCharCode(byte) : ".";
+    }
+
+    // Print what we found to the green debug box!
+    document.getElementById('debugRaw').innerText = `HEX: ${rawHex} | TXT: ${safeAscii}`;
+
+    // 2. Add to our buffer using the safe ASCII text
+    dataBuffer += safeAscii;
+    let lines = dataBuffer.split('\n');
+    
+    if (lines.length > 1) {
+        dataBuffer = lines.pop(); 
+        for (let line of lines) {
+            let cleanLine = line.trim();
+            if(cleanLine.length > 0 && cleanLine.includes(',')) {
+                parseFirmwareLine(cleanLine);
+            }
+        }
+        liveChart.update();
+    }
+});
 
                 bleRxCharacteristic = await service.getCharacteristic(RX_CHAR_UUID);
                 document.getElementById('status').innerText = "Status: Connected & Streaming";
