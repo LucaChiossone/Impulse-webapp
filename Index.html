@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IMPULSE HIT Mobile</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: -apple-system, system-ui, sans-serif; background-color: #121212; color: #fff; text-align: center; margin: 0; padding: 10px; }
+        .card { background: #1e1e1e; border-radius: 12px; padding: 20px; margin: 10px auto; max-width: 600px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+        .btn { color: white; border: none; padding: 15px; font-size: 16px; border-radius: 8px; font-weight: bold; cursor: pointer; width: 100%; margin-bottom: 10px; transition: 0.2s; }
+        .btn-blue { background: #007AFF; } .btn-blue:active { background: #0056b3; }
+        .btn-red { background: #ff3b30; } .btn-red:active { background: #cc2e26; }
+        .btn-green { background: #34c759; } .btn-green:active { background: #28a745; }
+        .flex-row { display: flex; gap: 10px; margin-bottom: 15px; }
+        .data-box { background: #2c2c2c; padding: 10px; border-radius: 8px; flex: 1; font-size: 20px; font-weight: bold; }
+        .data-label { font-size: 11px; color: #888; text-transform: uppercase; display: block; margin-bottom: 2px; }
+        canvas { max-width: 100%; margin-top: 10px; }
+        #sensorBoxContainer { perspective: 800px; margin: 20px auto; width: 80px; height: 80px; }
+        #sensorBox { width: 100%; height: 100%; background: linear-gradient(135deg, #007AFF, #34c759); border-radius: 8px; transform-style: preserve-3d; transition: transform 0.05s linear; box-shadow: 0 10px 20px rgba(0,0,0,0.5); }
+        
+        /* Settings Panel Styles */
+        .settings-grid { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+        select, input { padding: 10px; border-radius: 6px; border: 1px solid #444; background: #2c2c2c; color: white; font-size: 14px; }
+        .btn-small { padding: 10px; font-size: 14px; background: #ff9500; }
+    </style>
+</head>
+<body>
+
+    <div class="card">
+        <h2>IMPULSE HIT</h2>
+        <div class="flex-row">
+            <button id="connectBtn" class="btn btn-blue">Connect Sensor</button>
+            <button id="recordBtn" class="btn btn-green" disabled>Start Recording</button>
+        </div>
+        <div id="status" style="font-size: 14px; color: #aaa; margin-bottom: 15px;">Status: Disconnected</div>
+
+        <div id="sensorBoxContainer">
+            <div id="sensorBox"></div>
+        </div>
+
+        <div class="flex-row">
+            <div class="data-box"><span class="data-label">Peak G (X)</span><span id="val_hx">0.0</span></div>
+            <div class="data-box"><span class="data-label">Temp °C</span><span id="val_temp">0.0</span></div>
+            <div class="data-box"><span class="data-label">Rec Rows</span><span id="val_rows">0</span></div>
+        </div>
+
+        <canvas id="liveChart" height="200"></canvas>
+    </div>
+
+    <div class="card" id="configPanel" style="opacity: 0.5; pointer-events: none;">
+        <h3 style="margin-top: 0; text-align: left; font-size: 16px;">Device Settings</h3>
+        <div class="settings-grid">
+            <select id="configParam">
+                <option value="HG_FS">High-G Full Scale</option>
+                <option value="XL_FS">Low-G Full Scale</option>
+                <option value="FF_THS">Free-fall Threshold</option>
+                <option value="TAP_THS">Tap Threshold</option>
+                <option value="LOOP_MS">Loop Delay (ms)</option>
+            </select>
+            <input type="number" id="configValue" placeholder="Value" value="160">
+            <button id="sendConfigBtn" class="btn btn-small">Send</button>
+        </div>
+        <div id="configStatus" style="font-size: 12px; color: #888; text-align: left;">Waiting for connection...</div>
+    </div>
+
+    <script>
+        // --- 1. Madgwick AHRS Filter ---
+        class MadgwickAHRS {
+            constructor(beta = 0.1) { this.beta = beta; this.q = [1.0, 0.0, 0.0, 0.0]; }
+            update(gx, gy, gz, ax, ay, az, dt) {
+                let q0 = this.q[0], q1 = this.q[1], q2 = this.q[2], q3 = this.q[3];
+                let recipNorm = 1.0 / Math.sqrt(ax * ax + ay * ay + az * az);
+                if (!isFinite(recipNorm)) return;
+                ax *= recipNorm; ay *= recipNorm; az *= recipNorm;
+                let s0 = 4.0 * q0 * q2 * q2 + 2.0 * q2 * ax + 4.0 * q0 * q1 * q1 - 2.0 * q1 * ay;
+                let s1 = 4.0 * q1 * q3 * q3 - 2.0 * q3 * ax + 4.0 * q0 * q0 * q1 - 2.0 * q0 * ay - 4.0 * q1 + 8.0 * q1 * q1 * q1 + 8.0 * q1 * q2 * q2 + 4.0 * q1 * az;
+                let s2 = 4.0 * q0 * q0 * q2 + 2.0 * q0 * ax + 4.0 * q2 * q3 * q3 - 2.0 * q3 * ay - 4.0 * q2 + 8.0 * q2 * q1 * q1 + 8.0 * q2 * q2 * q2 + 4.0 * q2 * az;
+                let s3 = 4.0 * q1 * q1 * q3 - 2.0 * q1 * ax + 4.0 * q2 * q2 * q3 - 2.0 * q2 * ay;
+                recipNorm = 1.0 / Math.sqrt(s0 * s0 + s1 * s1 + s2 * s2 + s3 * s3);
+                s0 *= recipNorm; s1 *= recipNorm; s2 *= recipNorm; s3 *= recipNorm;
+                let qDot1 = 0.5 * (-q1 * gx - q2 * gy - q3 * gz) - this.beta * s0;
+                let qDot2 = 0.5 * (q0 * gx + q2 * gz - q3 * gy) - this.beta * s1;
+                let qDot3 = 0.5 * (q0 * gy - q1 * gz + q3 * gx) - this.beta * s2;
+                let qDot4 = 0.5 * (q0 * gz + q1 * gy - q2 * gx) - this.beta * s3;
+                q0 += qDot1 * dt; q1 += qDot2 * dt; q2 += qDot3 * dt; q3 += qDot4 * dt;
+                recipNorm = 1.0 / Math.sqrt(q0 * q0 + q1 * q1 + q2 * q2 + q3 * q3);
+                this.q = [q0 * recipNorm, q1 * recipNorm, q2 * recipNorm, q3 * recipNorm];
+            }
+            getEulerAngles() {
+                let w = this.q[0], x = this.q[1], y = this.q[2], z = this.q[3];
+                return {
+                    roll: Math.atan2(2.0 * (w * x + y * z), 1.0 - 2.0 * (x * x + y * y)),
+                    pitch: Math.asin(2.0 * (w * y - z * x)),
+                    yaw: Math.atan2(2.0 * (w * z + x * y), 1.0 - 2.0 * (y * y + z * z))
+                };
+            }
+        }
+
+        // --- 2. BLE & App State ---
+        const SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
+        const TX_CHAR_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8"; // ESP32 -> Phone
+        const RX_CHAR_UUID = "beb5483f-36e1-4688-b7f5-ea07361b26a8"; // Phone -> ESP32
+        
+        let bleDevice, bleRxCharacteristic, dataBuffer = "";
+        const ahrs = new MadgwickAHRS(0.1);
+        let lastTime = performance.now();
+
+        // Recording
+        let isRecording = false;
+        let sessionData = [];
+        const CSV_HEADER = "timestamp,gx_dps,gy_dps,gz_dps,hx_g,hy_g,hz_g,ax_g,ay_g,az_g,temp_C";
+
+        // Chart Setup
+        const maxPoints = 50;
+        const ctx = document.getElementById('liveChart').getContext('2d');
+        const liveChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: Array(maxPoints).fill(''),
+                datasets: [
+                    { label: 'High-G X', borderColor: '#ff3b30', data: Array(maxPoints).fill(0), tension: 0.1, pointRadius: 0 },
+                    { label: 'High-G Y', borderColor: '#34c759', data: Array(maxPoints).fill(0), tension: 0.1, pointRadius: 0 },
+                    { label: 'High-G Z', borderColor: '#007AFF', data: Array(maxPoints).fill(0), tension: 0.1, pointRadius: 0 }
+                ]
+            },
+            options: { animation: false, scales: { y: { suggestedMin: -5, suggestedMax: 5 } }, plugins: { legend: { labels: { color: 'white' } } } }
+        });
+
+        // --- 3. BLE Logic ---
+        document.getElementById('connectBtn').addEventListener('click', async () => {
+            if (bleDevice && bleDevice.gatt.connected) {
+                bleDevice.gatt.disconnect(); return;
+            }
+            try {
+                document.getElementById('status').innerText = "Status: Scanning...";
+                bleDevice = await navigator.bluetooth.requestDevice({ filters: [{ services: [SERVICE_UUID] }] });
+                
+                bleDevice.addEventListener('gattserverdisconnected', () => {
+                    document.getElementById('status').innerText = "Status: Disconnected";
+                    document.getElementById('connectBtn').innerText = "Connect Sensor";
+                    document.getElementById('connectBtn').className = "btn btn-blue";
+                    document.getElementById('recordBtn').disabled = true;
+                    document.getElementById('configPanel').style.opacity = "0.5";
+                    document.getElementById('configPanel').style.pointerEvents = "none";
+                    if(isRecording) stopRecording();
+                });
+                
+                const server = await bleDevice.gatt.connect();
+                const service = await server.getPrimaryService(SERVICE_UUID);
+                
+                // Get TX (Read/Notify)
+                const txChar = await service.getCharacteristic(TX_CHAR_UUID);
+                await txChar.startNotifications();
+                txChar.addEventListener('characteristicvaluechanged', (e) => {
+                    dataBuffer += new TextDecoder().decode(e.target.value);
+                    let lines = dataBuffer.split('\n');
+                    if (lines.length > 1) {
+                        dataBuffer = lines.pop(); 
+                        parseFirmwareLine(lines[lines.length - 1]);
+                    }
+                });
+
+                // Get RX (Write)
+                bleRxCharacteristic = await service.getCharacteristic(RX_CHAR_UUID);
+                
+                document.getElementById('status').innerText = "Status: Connected & Streaming";
+                document.getElementById('connectBtn').innerText = "Disconnect";
+                document.getElementById('connectBtn').className = "btn btn-red";
+                document.getElementById('recordBtn').disabled = false;
+                
+                // Enable Settings Panel
+                document.getElementById('configPanel').style.opacity = "1";
+                document.getElementById('configPanel').style.pointerEvents = "auto";
+                document.getElementById('configStatus').innerText = "Ready to send commands.";
+
+            } catch (err) { document.getElementById('status').innerText = "Error: " + err.message; }
+        });
+
+        // --- 4. Send Settings to ESP32 ---
+        document.getElementById('sendConfigBtn').addEventListener('click', async () => {
+            if (!bleRxCharacteristic) return;
+            
+            const param = document.getElementById('configParam').value;
+            const val = document.getElementById('configValue').value;
+            
+            // Format depends on your ESP32 firmware. Example: "SET:HG_FS:160\n"
+            const commandString = `SET:${param}:${val}\n`; 
+            
+            try {
+                const encoder = new TextEncoder();
+                await bleRxCharacteristic.writeValue(encoder.encode(commandString));
+                document.getElementById('configStatus').innerText = `Sent: ${commandString.trim()}`;
+                document.getElementById('configStatus').style.color = "#34c759";
+            } catch (err) {
+                document.getElementById('configStatus').innerText = "Failed: " + err.message;
+                document.getElementById('configStatus').style.color = "#ff3b30";
+            }
+        });
+
+        // --- 5. Data Parsing ---
+        function parseFirmwareLine(line) {
+            if (!line.startsWith("IMU:")) return;
+            const parts = line.substring(4).split(',');
+            if (parts.length < 10) return;
+
+            const gx = parseFloat(parts[1]), gy = parseFloat(parts[2]), gz = parseFloat(parts[3]);
+            const hx = parseFloat(parts[4]), hy = parseFloat(parts[5]), hz = parseFloat(parts[6]);
+            const ax = parseFloat(parts[7]), ay = parseFloat(parts[8]), az = parseFloat(parts[9]);
+            const temp = parseFloat(parts[10]);
+
+            if (isRecording) {
+                sessionData.push(`${new Date().toISOString()},${gx},${gy},${gz},${hx},${hy},${hz},${ax},${ay},${az},${temp}`);
+                document.getElementById('val_rows').innerText = sessionData.length - 1;
+            }
+
+            let now = performance.now();
+            let dt = (now - lastTime) / 1000.0;
+            lastTime = now;
+            ahrs.update(gx * (Math.PI/180), gy * (Math.PI/180), gz * (Math.PI/180), ax, ay, az, dt);
+            
+            let euler = ahrs.getEulerAngles();
+            document.getElementById('sensorBox').style.transform = `rotateX(${-euler.pitch * 180/Math.PI}deg) rotateY(${euler.yaw * 180/Math.PI}deg) rotateZ(${euler.roll * 180/Math.PI}deg)`;
+
+            document.getElementById('val_hx').innerText = hx.toFixed(2);
+            document.getElementById('val_temp').innerText = temp.toFixed(1);
+
+            liveChart.data.datasets[0].data.push(hx); liveChart.data.datasets[0].data.shift();
+            liveChart.data.datasets[1].data.push(hy); liveChart.data.datasets[1].data.shift();
+            liveChart.data.datasets[2].data.push(hz); liveChart.data.datasets[2].data.shift();
+            liveChart.update();
+        }
+
+        // --- 6. Recording ---
+        document.getElementById('recordBtn').addEventListener('click', () => {
+            if (isRecording) stopRecording(); else startRecording();
+        });
+        function startRecording() {
+            isRecording = true;
+            sessionData = [CSV_HEADER];
+            document.getElementById('recordBtn').innerText = "Stop & Save CSV";
+            document.getElementById('recordBtn').className = "btn btn-red";
+        }
+        function stopRecording() {
+            isRecording = false;
+            document.getElementById('recordBtn').innerText = "Start Recording";
+            document.getElementById('recordBtn').className = "btn btn-green";
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(new Blob([sessionData.join('\n')], { type: 'text/csv' }));
+            a.download = `impulse_session_${new Date().getTime()}.csv`;
+            a.click();
+        }
+    </script>
+</body>
+</html>
