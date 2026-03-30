@@ -93,12 +93,19 @@
         .alert-crit { background: rgba(239, 68, 68, 0.15); color: var(--red); border-color: rgba(239, 68, 68, 0.3); }
         .alert-warn { background: rgba(245, 158, 11, 0.15); color: var(--amber); border-color: rgba(245, 158, 11, 0.3); }
 
-        /* Overlays */
+        /* Overlays & Progress */
         #critical-overlay { position: fixed; inset: 0; background: var(--red); z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 20px; display: none; }
         #critical-val { font-size: 96px; font-weight: 900; color: white; line-height: 1; margin-bottom: 10px; }
         #critical-lbl { font-size: 24px; font-weight: 800; color: white; text-transform: uppercase; letter-spacing: 2px; }
         
         #no-ble-banner { position: fixed; inset: 0; background: rgba(17, 24, 39, 0.95); z-index: 200; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; text-align: center; display: none; }
+
+        @keyframes indeterminate {
+            0% { transform: translateX(-100%) scaleX(0.2); }
+            50% { transform: translateX(0%) scaleX(0.5); }
+            100% { transform: translateX(100%) scaleX(0.2); }
+        }
+        .progress-bar-fill { animation: indeterminate 1.5s infinite linear; transform-origin: left; width: 100%; height: 100%; background: var(--cyan); }
     </style>
 </head>
 <body>
@@ -216,18 +223,23 @@
                         <div id="bat-detail" style="font-size: 13px; color: var(--text-muted); font-weight: 600;">--% — -.-- V</div>
                     </div>
 
-                    <div class="card" id="buffer-card" style="display: none;">
+                    <div class="card" id="session-buffer-section" style="display: none;">
                         <h2>Device Storage</h2>
-                        <p id="buffer-text" style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">0 rows buffered (~0 KB)</p>
-                        <button id="getSessionBtn" class="btn btn-cyan">Upload Session</button>
-                        <button id="ackSessionBtn" class="btn btn-red">Clear Buffer</button>
+                        <p id="session-buffer-label" style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;"></p>
+                        
+                        <div id="upload-progress" style="display: none; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; margin-bottom: 16px;">
+                            <div class="progress-bar-fill"></div>
+                        </div>
+
+                        <button id="upload-session-btn" class="btn btn-cyan">Upload Session</button>
+                        <button id="clear-buffer-btn" class="btn btn-red">Clear Buffer</button>
                     </div>
 
                     <div class="card">
                         <h2>Calibration</h2>
                         <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">Place the sensor on a flat, motionless surface.</p>
                         <button id="calibrateBtn" class="btn btn-gray">Calibrate Gyroscope</button>
-                        <div id="calStatus" style="font-size: 12px; color: var(--cyan); margin-top: 8px; text-align: center;"></div>
+                        <div id="calStatus" style="font-size: 12px; font-weight: 600; color: var(--text-muted); margin-top: 12px; text-align: center;"></div>
                     </div>
                 </div>
             </div>
@@ -346,7 +358,6 @@
             if(name === 'Impact') accelChart.resize();
         }
 
-        // Swipe logic
         let touchstartX = 0; let touchendX = 0;
         const pageContent = document.getElementById('page-content');
         pageContent.addEventListener('touchstart', e => touchstartX = e.changedTouches[0].screenX, {passive: true});
@@ -515,17 +526,11 @@
 
         Chart.defaults.color = '#9ca3af'; Chart.defaults.borderColor = '#374151';
         
-        // BUG 2 FIX: Ensure maintainAspectRatio is false and initial limits are set
         const commonOptions = { 
-            animation: false, 
-            responsive: true, 
-            maintainAspectRatio: false, 
+            animation: false, responsive: true, maintainAspectRatio: false, 
             elements: { point: { radius: 0 }, line: { borderWidth: 1.5 } }, 
             plugins: { legend: { display: false } }, 
-            scales: { 
-                x: { type: 'linear', min: 0, max: 10, display: true }, 
-                y: { display: true } 
-            } 
+            scales: { x: { type: 'linear', min: 0, max: 10, display: true }, y: { display: true } } 
         };
         
         const gyroChart = new Chart(document.getElementById('gyroChart').getContext('2d'), { type: 'line', data: { datasets: [ { borderColor: '#ef4444', data: [] }, { borderColor: '#10b981', data: [] }, { borderColor: '#3b82f6', data: [] } ]}, options: commonOptions });
@@ -535,44 +540,22 @@
 
         setInterval(() => {
             if (rowsSinceRefresh === 0) return; rowsSinceRefresh = 0;
+            let data; let isFull = (chartMode === 'full');
             
-            let data;
-            let isFull = (chartMode === 'full');
-            
-            if (!isFull) { 
-                data = ring.getWindow(10); 
-            } else { 
-                const ordered = ring.getOrdered(); 
-                if (ordered) data = ring.downsample(ordered, 80); 
-            }
-
+            if (!isFull) { data = ring.getWindow(10); } 
+            else { const ordered = ring.getOrdered(); if (ordered) data = ring.downsample(ordered, 80); }
             if (!data || data.t.length < 2) return;
 
-            // BUG 1 FIX: Explicitly set axis min and max to track the rolling window
             const tArr = isFull ? data.t.map(t => t / 60.0) : data.t;
-            const xMin = tArr[0];
-            const xMax = tArr[tArr.length - 1];
-            const xPad = (xMax - xMin) * 0.02 || 0.1;
+            const xMin = tArr[0]; const xMax = tArr[tArr.length - 1]; const xPad = (xMax - xMin) * 0.02 || 0.1;
 
-            gyroChart.data.datasets[0].data = tArr.map((t, i) => ({x: t, y: data.gx[i]})); 
-            gyroChart.data.datasets[1].data = tArr.map((t, i) => ({x: t, y: data.gy[i]})); 
-            gyroChart.data.datasets[2].data = tArr.map((t, i) => ({x: t, y: data.gz[i]}));
-            gyroChart.options.scales.x.min = xMin - xPad;
-            gyroChart.options.scales.x.max = xMax + xPad;
-            gyroChart.options.scales.x.title = { display: true, text: isFull ? 'Time (min)' : 'Time (s)', color: '#9ca3af' };
+            gyroChart.data.datasets[0].data = tArr.map((t, i) => ({x: t, y: data.gx[i]})); gyroChart.data.datasets[1].data = tArr.map((t, i) => ({x: t, y: data.gy[i]})); gyroChart.data.datasets[2].data = tArr.map((t, i) => ({x: t, y: data.gz[i]}));
+            gyroChart.options.scales.x.min = xMin - xPad; gyroChart.options.scales.x.max = xMax + xPad; gyroChart.options.scales.x.title = { display: true, text: isFull ? 'Time (min)' : 'Time (s)', color: '#9ca3af' };
             
-            accelChart.data.datasets[0].data = tArr.map((t, i) => ({x: t, y: data.hx[i]})); 
-            accelChart.data.datasets[1].data = tArr.map((t, i) => ({x: t, y: data.hy[i]})); 
-            accelChart.data.datasets[2].data = tArr.map((t, i) => ({x: t, y: data.hz[i]}));
-            accelChart.options.scales.x.min = xMin - xPad;
-            accelChart.options.scales.x.max = xMax + xPad;
-            accelChart.options.scales.x.title = { display: true, text: isFull ? 'Time (min)' : 'Time (s)', color: '#9ca3af' };
+            accelChart.data.datasets[0].data = tArr.map((t, i) => ({x: t, y: data.hx[i]})); accelChart.data.datasets[1].data = tArr.map((t, i) => ({x: t, y: data.hy[i]})); accelChart.data.datasets[2].data = tArr.map((t, i) => ({x: t, y: data.hz[i]}));
+            accelChart.options.scales.x.min = xMin - xPad; accelChart.options.scales.x.max = xMax + xPad; accelChart.options.scales.x.title = { display: true, text: isFull ? 'Time (min)' : 'Time (s)', color: '#9ca3af' };
             
-            // BUG 1 FIX: 'none' bypasses animation causing lag/dotting
-            if(activeChartIdx === 0) gyroChart.update('none'); 
-            if(activeChartIdx === 1) accelChart.update('none');
-
-            // console.log('ring count:', ring.count, 'tRange:', data?.t?.length);
+            if(activeChartIdx === 0) gyroChart.update('none'); if(activeChartIdx === 1) accelChart.update('none');
 
             let pkHG = Math.max(ring.peakHx, ring.peakHy, ring.peakHz);
             document.getElementById('val_hx').innerText = pkHG.toFixed(1);
@@ -582,7 +565,6 @@
             document.getElementById('val_gx').innerText = Math.max(ring.peakGx, ring.peakGy, ring.peakGz).toFixed(0);
             if (data.temp.length > 0) document.getElementById('val_temp').innerText = data.temp[data.temp.length - 1].toFixed(1);
             
-            // Draw SVG
             const svg = document.getElementById('directionSvg');
             if(impactArray.length > 0) {
                 document.getElementById('dir-empty').style.display = 'none';
@@ -592,6 +574,7 @@
             }
         }, 200);
 
+        // --- UI / COMMAND FUNCTIONS ---
         function updateUIConnection(status) {
             isConnected = status;
             document.getElementById('conn-dot').style.background = status ? 'var(--cyan)' : 'var(--text-muted)';
@@ -607,6 +590,28 @@
             document.getElementById('configPanel').style.pointerEvents = status ? "auto" : "none";
             if(status) reqWakeLock(); else if(wakeLock) { wakeLock.release(); wakeLock = null; }
         }
+
+        function updateSessionBufferUI(pending, rows) {
+            const section = document.getElementById("session-buffer-section");
+            const label = document.getElementById("session-buffer-label");
+            if (pending && rows > 0) {
+                const kb = Math.round(rows * 24 / 1024);
+                label.textContent = `${rows} rows buffered on device (~${kb} KB)`;
+                section.style.display = "block";
+                document.getElementById('upload-session-btn').style.display = 'flex';
+                document.getElementById('upload-progress').style.display = 'none';
+            } else {
+                section.style.display = "none";
+            }
+        }
+
+        function showCalibrationResult(message, isError) {
+            const calStatus = document.getElementById('calStatus');
+            calStatus.innerText = message;
+            calStatus.style.color = isError ? "var(--red)" : "var(--cyan)";
+        }
+
+        async function sendCommand(cmd) { if (bleRxCharacteristic) { try { await bleRxCharacteristic.writeValueWithoutResponse(new TextEncoder().encode(cmd + "\n")); } catch (err) {} } }
 
         document.getElementById('connectBtn').addEventListener('click', async () => {
             try {
@@ -655,8 +660,10 @@
                 if (type === 0xB3) {
                     if (uploadSession.id) {
                         dbFinalizeSession(uploadSession.id, new Date().toISOString(), uploadSession.idx, uploadSession.peakHG).then(refreshSessionList);
-                        uploadSession.id = null; document.getElementById('getSessionBtn').innerText = "Upload Complete";
+                        uploadSession.id = null; 
                     }
+                    updateSessionBufferUI(false, 0);
+                    document.getElementById('upload-progress').style.display = 'none';
                     rxBuffer.copyWithin(0, 1); rxBufferLen -= 1; break;
                 }
                 if (type !== 0xB1 && type !== 0xB2) { rxBufferLen = 0; break; }
@@ -667,6 +674,7 @@
             }
         }
 
+        // FIX 1 & 2 logic implemented here
         function processTextLine(line) {
             if (line.startsWith("S:")) {
                 try {
@@ -679,7 +687,7 @@
                         if(cfg.HG_FS) document.getElementById('cfg_hg_fs').value = cfg.HG_FS;
                         if(cfg.LOOP_MS) document.getElementById('cfg_loop').value = cfg.LOOP_MS;
                     }
-                    if (obj.battery !== undefined) {
+                    if (typeof obj.battery === "number") {
                         const pct = Math.min(100, Math.max(0, obj.battery));
                         document.getElementById('bat-text').innerText = pct + '%';
                         document.getElementById('bat-detail').innerText = `${pct}% — ${obj.vbat} V`;
@@ -687,8 +695,8 @@
                         document.getElementById('bat-fill').style.background = pct > 40 ? 'var(--cyan)' : (pct > 15 ? 'var(--amber)' : 'var(--red)');
                     }
                     if (obj.session_pending !== undefined) {
-                        document.getElementById('buffer-card').style.display = obj.rows > 0 ? 'block' : 'none';
-                        document.getElementById('buffer-text').innerText = `${obj.rows} rows buffered (~${Math.round((obj.rows*24)/1024)} KB)`;
+                        const rows = obj.rows ?? 0;
+                        updateSessionBufferUI(obj.session_pending, rows);
                     }
                 } catch(e) {}
             } else if (line.startsWith("H_BIN:")) {
@@ -699,7 +707,13 @@
                 } catch(e) {}
             } else if (line.startsWith("CAL:")) {
                 const parts = line.slice(4).split(",");
-                document.getElementById('calStatus').innerText = `Bias: ${parseFloat(parts[0]).toFixed(1)}, ${parseFloat(parts[1]).toFixed(1)}, ${parseFloat(parts[2]).toFixed(1)}`;
+                const gx = parseFloat(parts[0]); const gy = parseFloat(parts[1]); const gz = parseFloat(parts[2]);
+                const status = parts[3] ? parts[3].trim() : "";
+                if (status === "ok") {
+                    showCalibrationResult(`OK — Bias: ${gx.toFixed(4)}, ${gy.toFixed(4)}, ${gz.toFixed(4)} deg/s`, false);
+                } else {
+                    showCalibrationResult("Calibration FAILED — keep device still and retry", true);
+                }
             }
         }
 
@@ -781,21 +795,46 @@
             if (uploadBatch.length > 0) { dbAppendRows(uploadSession.id, uploadSession.idx, uploadBatch); uploadSession.idx += uploadBatch.length; }
         }
 
-        async function sendCommand(cmd) { if (bleRxCharacteristic) { try { await bleRxCharacteristic.writeValue(new TextEncoder().encode(cmd + "\n")); } catch (err) {} } }
-        
         document.getElementById('sendConfigBtn').addEventListener('click', () => {
             const payload = { XL_ODR: Number(document.getElementById('cfg_xl_odr').value), XL_FS: Number(document.getElementById('cfg_xl_fs').value), G_FS: Number(document.getElementById('cfg_g_fs').value), HG_FS: Number(document.getElementById('cfg_hg_fs').value), LOOP_MS: Number(document.getElementById('cfg_loop').value) };
             sendCommand(`SET_CONFIG:${JSON.stringify(payload)}`);
             document.getElementById('configStatus').innerText = "✓ Applied"; setTimeout(()=>document.getElementById('configStatus').innerText="", 2000);
         });
+        
         document.getElementById('getConfigBtn').addEventListener('click', () => sendCommand("GET_CONFIG"));
-        document.getElementById('calibrateBtn').addEventListener('click', () => { sendCommand("CALIBRATE"); document.getElementById('calStatus').innerText = "Hold device still..."; });
-        document.getElementById('ackSessionBtn').addEventListener('click', () => { if(confirm("Clear device memory?")) sendCommand("SESSION_ACK"); });
+        
+        // FIX 1: Exact CALIBRATE command implementation
+        document.getElementById('calibrateBtn').addEventListener('click', async () => {
+            if (!bleRxCharacteristic) return;
+            try {
+                await bleRxCharacteristic.writeValueWithoutResponse(new TextEncoder().encode("CALIBRATE\n"));
+                showCalibrationResult("Hold device still...", false);
+                document.getElementById('calStatus').style.color = "var(--text-muted)";
+            } catch (e) {}
+        });
 
-        document.getElementById('getSessionBtn').addEventListener('click', async () => {
+        // FIX 2: Exact Clear Buffer & Upload implementations
+        document.getElementById('clear-buffer-btn').addEventListener('click', async () => { 
+            if (confirm("Delete the session buffer on the device? This cannot be undone.")) {
+                if (!bleRxCharacteristic) return;
+                try {
+                    await bleRxCharacteristic.writeValueWithoutResponse(new TextEncoder().encode("SESSION_ACK\n"));
+                    updateSessionBufferUI(false, 0);
+                } catch (e) {}
+            }
+        });
+
+        document.getElementById('upload-session-btn').addEventListener('click', async () => {
+            if (!bleRxCharacteristic) return;
             uploadSession.id = await dbCreateSession({ startedAt: new Date().toISOString(), endedAt: null, rowCount: 0, deviceName: "IMPULSE", peakHG: 0, isUpload: true });
             uploadSession.startWall = new Date(); uploadSession.firstTRel = null; uploadSession.idx = 0; uploadSession.peakHG = 0;
-            document.getElementById('getSessionBtn').innerText = "Receiving..."; sendCommand("GET_SESSION");
+            
+            document.getElementById('upload-session-btn').style.display = 'none';
+            document.getElementById('upload-progress').style.display = 'block';
+            
+            try {
+                await bleRxCharacteristic.writeValueWithoutResponse(new TextEncoder().encode("GET_SESSION\n"));
+            } catch (e) {}
         });
 
         async function refreshSessionList() {
