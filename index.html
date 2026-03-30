@@ -314,6 +314,10 @@
         let keepaliveInterval = null;
         let wakeLock          = null;
 
+        let intentionalDisconnect = false;
+        let reconnectAttempts = 0;
+        const MAX_RECONNECT = 5;
+
         const SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
         const TX_CHAR_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
         const RX_CHAR_UUID = "beb5483f-36e1-4688-b7f5-ea07361b26a8";
@@ -338,43 +342,84 @@
         function startKeepalive() {
             stopKeepalive();
             keepaliveInterval = setInterval(async () => {
-                if (isConnected) await sendCommand("GET_BATTERY");
-            }, 25000);
+                if (!isConnected || !rxCharacteristic) return;
+                try {
+                    await rxCharacteristic.writeValueWithoutResponse(
+                        new TextEncoder().encode("GET_BATTERY\n")
+                    );
+                } catch (e) {
+                    console.warn("Keepalive failed:", e);
+                }
+            }, 10000);
         }
+        
         function stopKeepalive() {
             if (keepaliveInterval) { clearInterval(keepaliveInterval); keepaliveInterval = null; }
         }
 
         document.addEventListener("visibilitychange", async () => {
-            if (document.visibilityState !== "visible") return;
-            if (isConnected) requestWakeLock(); 
-
-            if (!bleDevice) return;
-            await new Promise(r => setTimeout(r, 500)); // iOS needs a moment
-
-            if (!bleDevice.gatt.connected) {
-                console.log("Reconnecting after foreground...");
-                try {
-                    bleServer = await bleDevice.gatt.connect();
-                    const service = await bleServer.getPrimaryService(SERVICE_UUID);
-                    txCharacteristic = await service.getCharacteristic(TX_CHAR_UUID);
-                    rxCharacteristic = await service.getCharacteristic(RX_CHAR_UUID);
-                    
-                    txCharacteristic.addEventListener("characteristicvaluechanged", onNotify);
-                    await txCharacteristic.startNotifications();
-                    
-                    isConnected = true;
-                    console.log("Reconnected successfully");
-                    
-                    updateUIConnection(true);
-                    startKeepalive();
-                    await sendCommand("GET_CONFIG");
-                } catch (e) {
-                    console.error("Reconnect failed:", e);
-                    onDisconnected();
-                }
+            if (document.visibilityState === "visible" && isConnected) {
+                requestWakeLock();
             }
         });
+
+        async function attemptReconnect() {
+            if (intentionalDisconnect || !bleDevice) return;
+            if (reconnectAttempts >= MAX_RECONNECT) {
+                console.log("Max reconnect attempts reached — giving up");
+                onDisconnected();
+                return;
+            }
+
+            reconnectAttempts++;
+            const delay = Math.min(1000 * reconnectAttempts, 5000);
+            console.log(`Reconnect attempt ${reconnectAttempts} in ${delay}ms...`);
+            
+            document.getElementById('conn-text').innerText = "Reconnecting...";
+            document.getElementById('conn-dot').style.background = "var(--amber)";
+            document.getElementById('conn-big-dot').style.background = "var(--amber)";
+
+            await new Promise(r => setTimeout(r, delay));
+
+            try {
+                bleServer = await bleDevice.gatt.connect();
+                const service = await bleServer.getPrimaryService(SERVICE_UUID);
+                txCharacteristic = await service.getCharacteristic(TX_CHAR_UUID);
+                rxCharacteristic = await service.getCharacteristic(RX_CHAR_UUID);
+                
+                txCharacteristic.addEventListener("characteristicvaluechanged", onNotify);
+                await txCharacteristic.startNotifications();
+
+                isConnected = true;
+                reconnectAttempts = 0;
+                
+                startKeepalive();
+                requestWakeLock();
+                await sendCommand("GET_CONFIG");
+                await sendCommand("GET_BATTERY");
+                
+                updateUIConnection(true);
+                console.log("Reconnected successfully");
+            } catch (e) {
+                console.warn("Reconnect attempt failed:", e);
+                attemptReconnect(); 
+            }
+        }
+
+        function onGattDisconnected() {
+            console.log("gattserverdisconnected fired. Intentional:", intentionalDisconnect);
+            isConnected = false;
+            stopKeepalive();
+            releaseWakeLock();
+            txCharacteristic = null;
+            rxCharacteristic = null;
+
+            if (!intentionalDisconnect) {
+                attemptReconnect();
+            } else {
+                onDisconnected();
+            }
+        }
 
         // --- UX / NAVIGATION ---
         const alertFeedArray = [];
@@ -684,13 +729,15 @@
         }
 
         async function connectBLE() {
+            intentionalDisconnect = false;
+            reconnectAttempts = 0;
             try {
                 document.getElementById('conn-text').innerText = "Scanning...";
                 bleDevice = await navigator.bluetooth.requestDevice({
                     filters: [{ namePrefix: "IMPULSE" }],
                     optionalServices: [SERVICE_UUID]
                 });
-                bleDevice.addEventListener("gattserverdisconnected", onDisconnected);
+                bleDevice.addEventListener("gattserverdisconnected", onGattDisconnected);
 
                 bleServer = await bleDevice.gatt.connect();
                 const service = await bleServer.getPrimaryService(SERVICE_UUID);
@@ -712,6 +759,10 @@
         document.getElementById('connectBtn').addEventListener('click', connectBLE);
         
         document.getElementById('disconnectBtn').addEventListener('click', () => { 
+            intentionalDisconnect = true;
+            reconnectAttempts = 0;
+            stopKeepalive();
+            releaseWakeLock();
             if(bleDevice) bleDevice.gatt.disconnect(); 
         });
 
