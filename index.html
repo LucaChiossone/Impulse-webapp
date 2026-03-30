@@ -8,80 +8,55 @@
     <title>IMPULSE HIT</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        /* iOS-Specific Optimizations */
         :root {
-            --bg: #F2F2F7;
-            --card-bg: #FFFFFF;
-            --text-main: #1C1C1E;
-            --text-muted: #8E8E93;
-            --blue: #007AFF;
-            --green: #34C759;
-            --red: #FF3B30;
-            --yellow: #FFCC00;
-            --border: #C6C6C8;
+            --bg: #F2F2F7; --card-bg: #FFFFFF; --text-main: #1C1C1E; --text-muted: #8E8E93;
+            --blue: #007AFF; --green: #34C759; --red: #FF3B30; --yellow: #FFCC00; --border: #C6C6C8;
             --safe-bottom: env(safe-area-inset-bottom, 20px);
         }
-
         @media (prefers-color-scheme: dark) {
-            :root {
-                --bg: #000000;
-                --card-bg: #1C1C1E;
-                --text-main: #FFFFFF;
-                --text-muted: #EBEBF599;
-                --border: #38383A;
-            }
+            :root { --bg: #000000; --card-bg: #1C1C1E; --text-main: #FFFFFF; --text-muted: #EBEBF599; --border: #38383A; }
         }
-
-        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; font-family: -apple-system, sans-serif; }
         body { background-color: var(--bg); color: var(--text-main); margin: 0; padding: 0; padding-bottom: calc(80px + var(--safe-bottom)); overflow-x: hidden; }
 
-        /* Typography */
         h1 { font-size: 34px; font-weight: 700; margin: 40px 16px 15px; letter-spacing: 0.3px; }
         h2 { font-size: 22px; font-weight: 600; margin: 0 0 15px 0; }
         
-        /* Layout & Tabs */
-        .tab-content { display: none; animation: fadeIn 0.25s cubic-bezier(0.2, 0.8, 0.2, 1); }
+        .tab-content { display: none; animation: fadeIn 0.25s ease-out; }
         .tab-content.active { display: block; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-        /* Cards */
         .card { background: var(--card-bg); border-radius: 16px; padding: 20px; margin: 0 16px 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
-        .card-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--border); }
-        .card-row:last-child { border-bottom: none; }
-        
-        /* Buttons */
-        .btn { border: none; padding: 16px; font-size: 17px; border-radius: 14px; font-weight: 600; cursor: pointer; width: 100%; transition: 0.2s; text-align: center; margin-bottom: 12px; }
-        .btn-blue { background: var(--blue); color: white; } .btn-blue:active { filter: brightness(0.8); }
+        .btn { border: none; padding: 16px; font-size: 17px; border-radius: 14px; font-weight: 600; cursor: pointer; width: 100%; transition: 0.2s; margin-bottom: 12px; }
+        .btn-blue { background: var(--blue); color: white; }
         .btn-green { background: var(--green); color: white; }
         .btn-red { background: var(--red); color: white; }
         .btn-gray { background: var(--border); color: var(--text-main); }
         
-        /* Telemetry Grid */
         .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; text-align: center; margin-bottom: 20px; }
         .data-box { background: var(--bg); padding: 14px 5px; border-radius: 12px; }
-        .data-val { font-size: 24px; font-weight: 700; display: block; font-variant-numeric: tabular-nums; }
-        .data-lbl { font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px; }
+        .data-val { font-size: 24px; font-weight: 700; display: block; }
+        .data-lbl { font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 600; }
 
-        /* 3D Box */
         #sensorBoxContainer { perspective: 800px; margin: 25px auto; width: 100px; height: 100px; }
         #sensorBox { width: 100%; height: 100%; background: linear-gradient(135deg, var(--blue), var(--green)); border-radius: 16px; transform-style: preserve-3d; transition: transform 0.05s linear; box-shadow: 0 15px 35px rgba(0,0,0,0.3); }
 
-        /* Alerts Feed */
         .alert-feed { max-height: 140px; overflow-y: auto; font-size: 13px; font-weight: 500; }
         .alert-item { padding: 8px 12px; border-radius: 8px; margin-bottom: 8px; display: flex; justify-content: space-between;}
         .alert-crit { background: rgba(255,59,48,0.15); color: var(--red); border: 1px solid rgba(255,59,48,0.3); }
         .alert-warn { background: rgba(255,204,0,0.15); color: var(--yellow); border: 1px solid rgba(255,204,0,0.3); }
 
-        /* Form Inputs */
-        input, select { background: var(--bg); color: var(--text-main); border: 1px solid var(--border); border-radius: 10px; padding: 12px; font-size: 16px; width: 100%; margin-top: 5px; appearance: none; margin-bottom: 10px;}
+        input, select { background: var(--bg); color: var(--text-main); border: 1px solid var(--border); border-radius: 10px; padding: 12px; font-size: 16px; width: 100%; margin-top: 5px; margin-bottom: 10px;}
         label { font-size: 13px; font-weight: 600; color: var(--text-muted); text-transform: uppercase;}
         
-        /* Bottom Navigation */
         .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: rgba(255, 255, 255, 0.85); height: calc(65px + var(--safe-bottom)); display: flex; justify-content: space-around; padding-top: 10px; border-top: 1px solid var(--border); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); z-index: 100; padding-bottom: var(--safe-bottom); }
         @media (prefers-color-scheme: dark) { .bottom-nav { background: rgba(28, 28, 30, 0.85); } }
         .nav-item { text-align: center; color: var(--text-muted); font-size: 10px; font-weight: 600; cursor: pointer; flex: 1; }
         .nav-item.active { color: var(--blue); }
         .nav-icon { font-size: 26px; display: block; margin-bottom: 2px; }
+
+        /* DEBUGGER STYLES */
+        #debugRaw { font-family: monospace; font-size: 10px; color: var(--green); text-align: center; background: #000; padding: 5px; border-radius: 6px; overflow: hidden; white-space: nowrap; margin-top: 10px; }
     </style>
 </head>
 <body>
@@ -93,12 +68,11 @@
             <button id="connectBtn" class="btn btn-blue">Connect Sensor</button>
             <button id="recordBtn" class="btn btn-gray" disabled>Start Session</button>
             <div id="status" style="font-size: 14px; color: var(--text-muted); text-align: center;">Status: Disconnected</div>
+            <div id="debugRaw">Waiting for raw data stream...</div>
         </div>
 
         <div class="card">
-            <div id="sensorBoxContainer">
-                <div id="sensorBox"></div>
-            </div>
+            <div id="sensorBoxContainer"><div id="sensorBox"></div></div>
             <div class="grid-3">
                 <div class="data-box"><span class="data-lbl">Peak G</span><span class="data-val" id="val_hx">0.0</span></div>
                 <div class="data-box"><span class="data-lbl">Temp °C</span><span class="data-val" id="val_temp">0.0</span></div>
@@ -109,25 +83,18 @@
 
         <div class="card">
             <h2>Live Alerts</h2>
-            <div class="alert-feed" id="alertFeed">
-                <div style="color: var(--text-muted); text-align: center; padding: 20px;">No alerts yet.</div>
-            </div>
+            <div class="alert-feed" id="alertFeed"><div style="color: var(--text-muted); text-align: center; padding: 20px;">No alerts yet.</div></div>
         </div>
     </div>
 
     <div id="tab-logs" class="tab-content">
         <h1>Session Logs</h1>
-        <div class="card">
-            <p style="color: var(--text-muted); font-size: 14px;">Sessions recorded on this device will appear here. In this web version, data is downloaded instantly to your iOS Files app upon stopping a session.</p>
-            <button id="testDownloadBtn" class="btn btn-blue">Trigger Manual Download</button>
-        </div>
+        <div class="card"><p style="color: var(--text-muted);">Sessions download instantly to your iOS Files app upon stopping.</p></div>
     </div>
 
     <div id="tab-settings" class="tab-content">
         <h1>Device Settings</h1>
         <div class="card" id="configPanel" style="opacity: 0.5; pointer-events: none;">
-            <p style="color: var(--text-muted); font-size: 14px; margin-top: 0;">Push configurations directly to the IMPULSE ESP32.</p>
-            
             <label>Parameter</label>
             <select id="configParam">
                 <option value="HG_FS">High-G Full Scale</option>
@@ -135,24 +102,16 @@
                 <option value="TAP_THS">Tap Threshold</option>
                 <option value="LOOP_MS">Loop Delay (ms)</option>
             </select>
-            
             <label>Value</label>
-            <input type="number" id="configValue" placeholder="e.g., 160" value="160">
-            
-            <button id="sendConfigBtn" class="btn btn-green" style="margin-top: 10px;">Send to Device</button>
-            <div id="configStatus" style="font-size: 13px; color: var(--text-muted); text-align: center; margin-top: 10px;">Waiting for connection...</div>
+            <input type="number" id="configValue" value="160">
+            <button id="sendConfigBtn" class="btn btn-green">Send to Device</button>
+            <div id="configStatus" style="font-size: 13px; color: var(--text-muted); text-align: center;">Waiting...</div>
         </div>
     </div>
 
     <div id="tab-profile" class="tab-content">
         <h1>Profile</h1>
-        <div class="card">
-            <label>Athlete Name</label>
-            <input type="text" value="Demo User">
-            <label>Team / Organization</label>
-            <input type="text" value="RIT Tigers">
-            <button class="btn btn-blue" style="margin-top: 15px;">Save Profile</button>
-        </div>
+        <div class="card"><label>Athlete Name</label><input type="text" value="Demo User"><button class="btn btn-blue">Save Profile</button></div>
     </div>
 
     <div class="bottom-nav">
@@ -163,15 +122,12 @@
     </div>
 
     <script>
-        // --- Navigation Logic ---
         function switchTab(tabId, element) {
             document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
             document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-            document.getElementById('tab-' + tabId).classList.add('active');
-            element.classList.add('active');
+            document.getElementById('tab-' + tabId).classList.add('active'); element.classList.add('active');
         }
 
-        // --- Core Math & State ---
         class MadgwickAHRS {
             constructor(beta = 0.1) { this.beta = beta; this.q = [1.0, 0.0, 0.0, 0.0]; }
             update(gx, gy, gz, ax, ay, az, dt) {
@@ -199,39 +155,20 @@
             }
         }
 
-        // Ported from Python AlertManager
-        class AlertManager {
-            constructor() { this.IMPACT_WARN = 15.0; this.IMPACT_CRIT = 25.0; this.ACCEL_WARN = 1146.0; }
-            checkRow(hx, hy, hz, gx, gy, gz) {
-                let peak_g = Math.max(Math.abs(hx), Math.abs(hy), Math.abs(hz));
-                let peak_dps = Math.max(Math.abs(gx), Math.abs(gy), Math.abs(gz));
-                let ts = new Date().toLocaleTimeString([], {hour12: false});
-                if (peak_g >= this.IMPACT_CRIT) return { ts, sev: 'crit', msg: `Critical impact: ${peak_g.toFixed(1)} G` };
-                if (peak_g >= this.IMPACT_WARN) return { ts, sev: 'warn', msg: `High impact: ${peak_g.toFixed(1)} G` };
-                if (peak_dps >= this.ACCEL_WARN) return { ts, sev: 'warn', msg: `High rotation: ${(peak_dps * Math.PI / 180).toFixed(1)} rad/s` };
-                return null;
-            }
-        }
-
         const SERVICE_UUID = "4fafc201-1fb5-459e-8fcc-c5c9c331914b";
         const TX_CHAR_UUID = "beb5483e-36e1-4688-b7f5-ea07361b26a8";
         const RX_CHAR_UUID = "beb5483f-36e1-4688-b7f5-ea07361b26a8";
         
         let bleDevice, bleRxCharacteristic, dataBuffer = "";
         const ahrs = new MadgwickAHRS(0.1);
-        const alerts = new AlertManager();
         let lastTime = performance.now();
 
-        let isRecording = false;
-        let sessionData = [];
+        let isRecording = false; let sessionData = [];
         const CSV_HEADER = "timestamp,gx_dps,gy_dps,gz_dps,hx_g,hy_g,hz_g,ax_g,ay_g,az_g,temp_C";
 
-        // Chart Setup
-        const maxPoints = 50;
         const ctx = document.getElementById('liveChart').getContext('2d');
         const liveChart = new Chart(ctx, {
-            type: 'line',
-            data: { labels: Array(maxPoints).fill(''), datasets: [ { label: 'High-G X', borderColor: '#FF3B30', data: Array(maxPoints).fill(0), tension: 0.2, pointRadius: 0 } ] },
+            type: 'line', data: { labels: Array(50).fill(''), datasets: [ { label: 'High-G X', borderColor: '#FF3B30', data: Array(50).fill(0), tension: 0.2, pointRadius: 0 } ] },
             options: { animation: false, scales: { x: { display: false }, y: { suggestedMin: -5, suggestedMax: 5 } }, plugins: { legend: { display: false } } }
         });
 
@@ -246,10 +183,7 @@
                     document.getElementById('status').innerText = "Status: Disconnected";
                     document.getElementById('connectBtn').innerText = "Connect Sensor";
                     document.getElementById('connectBtn').className = "btn btn-blue";
-                    document.getElementById('recordBtn').className = "btn btn-gray";
                     document.getElementById('recordBtn').disabled = true;
-                    document.getElementById('configPanel').style.opacity = "0.5";
-                    document.getElementById('configPanel').style.pointerEvents = "none";
                     if(isRecording) stopRecording();
                 });
                 
@@ -261,65 +195,65 @@
                 txChar.addEventListener('characteristicvaluechanged', (e) => {
                     dataBuffer += new TextDecoder().decode(e.target.value);
                     let lines = dataBuffer.split('\n');
+                    
+                    // FIX #1: Process EVERY complete line, not just the last one
                     if (lines.length > 1) {
-                        dataBuffer = lines.pop(); 
-                        parseFirmwareLine(lines[lines.length - 1].trim());
+                        dataBuffer = lines.pop(); // Keep the incomplete part
+                        for (let line of lines) {
+                            let cleanLine = line.trim();
+                            if(cleanLine.length > 0) {
+                                document.getElementById('debugRaw').innerText = cleanLine; // Output to UI
+                                parseFirmwareLine(cleanLine);
+                            }
+                        }
+                        liveChart.update(); // Update chart once per chunk
                     }
                 });
 
                 bleRxCharacteristic = await service.getCharacteristic(RX_CHAR_UUID);
-                
                 document.getElementById('status').innerText = "Status: Connected & Streaming";
                 document.getElementById('connectBtn').innerText = "Disconnect";
                 document.getElementById('connectBtn').className = "btn btn-red";
                 document.getElementById('recordBtn').disabled = false;
-                document.getElementById('recordBtn').className = "btn btn-green";
-                
                 document.getElementById('configPanel').style.opacity = "1";
                 document.getElementById('configPanel').style.pointerEvents = "auto";
-                document.getElementById('configStatus').innerText = "Ready to send commands.";
             } catch (err) { document.getElementById('status').innerText = "Error: " + err.message; }
         });
 
-        // Send Command
-        document.getElementById('sendConfigBtn').addEventListener('click', async () => {
-            if (!bleRxCharacteristic) return;
-            const param = document.getElementById('configParam').value;
-            const val = document.getElementById('configValue').value;
-            const commandString = `SET:${param}:${val}\n`; 
-            try {
-                await bleRxCharacteristic.writeValue(new TextEncoder().encode(commandString));
-                document.getElementById('configStatus').innerText = `Sent: ${commandString.trim()}`;
-                document.getElementById('configStatus').style.color = "var(--green)";
-            } catch (err) {
-                document.getElementById('configStatus').innerText = "Failed: " + err.message;
-                document.getElementById('configStatus').style.color = "var(--red)";
-            }
-        });
-
-        // --- Data Parser (Raw CSV Version) ---
+        // --- FIX #2: Auto-Aligning Data Parser ---
         function parseFirmwareLine(line) {
             const parts = line.split(',');
-            if (parts.length < 11) return;
+            if (parts.length < 10) return; // Not enough data points
 
-            const gx = parseFloat(parts[2]), gy = parseFloat(parts[3]), gz = parseFloat(parts[4]);
-            const hx = parseFloat(parts[5]), hy = parseFloat(parts[6]), hz = parseFloat(parts[7]);
-            const ax = parseFloat(parts[8]), ay = parseFloat(parts[9]), az = parseFloat(parts[10]);
-            const temp = parseFloat(parts[11]); 
+            // By reading backwards, we ignore headers, prefixes, or timestamps at the front!
+            const temp = parseFloat(parts[parts.length - 1]);
+            const az = parseFloat(parts[parts.length - 2]);
+            const ay = parseFloat(parts[parts.length - 3]);
+            const ax = parseFloat(parts[parts.length - 4]);
+            const hz = parseFloat(parts[parts.length - 5]);
+            const hy = parseFloat(parts[parts.length - 6]);
+            const hx = parseFloat(parts[parts.length - 7]);
+            const gz = parseFloat(parts[parts.length - 8]);
+            const gy = parseFloat(parts[parts.length - 9]);
+            const gx = parseFloat(parts[parts.length - 10]);
 
+            // If it grabbed a non-number (like a header string), drop it
             if (isNaN(gx) || isNaN(hx) || isNaN(ax)) return;
 
             if (isRecording) {
-                sessionData.push(`${new Date().toISOString()},${gx},${gy},${gz},${hx},${hy},${hz},${ax},${ay},${az},${temp || 0}`);
+                sessionData.push(`${new Date().toISOString()},${gx},${gy},${gz},${hx},${hy},${hz},${ax},${ay},${az},${temp}`);
                 document.getElementById('val_rows').innerText = sessionData.length - 1;
             }
 
             // Alerts
-            let alert = alerts.checkRow(hx, hy, hz, gx, gy, gz);
-            if (alert) {
+            let peak_g = Math.max(Math.abs(hx), Math.abs(hy), Math.abs(hz));
+            if (peak_g >= 15.0) {
+                let sev = peak_g >= 25.0 ? 'crit' : 'warn';
+                let msg = peak_g >= 25.0 ? 'Critical impact' : 'High impact';
+                let ts = new Date().toLocaleTimeString([], {hour12: false});
                 const feed = document.getElementById('alertFeed');
                 if (feed.innerText.includes("No alerts yet")) feed.innerHTML = '';
-                feed.innerHTML = `<div class="alert-item alert-${alert.sev}"><span>${alert.msg}</span><span>${alert.ts}</span></div>` + feed.innerHTML;
+                feed.innerHTML = `<div class="alert-item alert-${sev}"><span>${msg}: ${peak_g.toFixed(1)} G</span><span>${ts}</span></div>` + feed.innerHTML;
             }
 
             // 3D Math
@@ -332,42 +266,37 @@
             document.getElementById('sensorBox').style.transform = `rotateX(${-euler.pitch * 180/Math.PI}deg) rotateY(${euler.yaw * 180/Math.PI}deg) rotateZ(${euler.roll * 180/Math.PI}deg)`;
 
             // UI
-            document.getElementById('val_hx').innerText = Math.max(Math.abs(hx), Math.abs(hy), Math.abs(hz)).toFixed(1);
-            document.getElementById('val_temp').innerText = (temp || 0).toFixed(1);
+            document.getElementById('val_hx').innerText = peak_g.toFixed(1);
+            document.getElementById('val_temp').innerText = temp.toFixed(1);
 
             liveChart.data.datasets[0].data.push(hx); liveChart.data.datasets[0].data.shift();
-            liveChart.update();
         }
 
-        // --- Recording Logic ---
+        // --- Recording & Settings ---
         document.getElementById('recordBtn').addEventListener('click', () => {
-            if (isRecording) stopRecording(); else startRecording();
+            if (isRecording) {
+                isRecording = false;
+                document.getElementById('recordBtn').innerText = "Start Session";
+                document.getElementById('recordBtn').className = "btn btn-gray";
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(new Blob([sessionData.join('\n')], { type: 'text/csv' }));
+                a.download = `impulse_session_${new Date().getTime()}.csv`;
+                a.click();
+            } else {
+                isRecording = true; sessionData = [CSV_HEADER];
+                document.getElementById('recordBtn').innerText = "Stop & Save CSV";
+                document.getElementById('recordBtn').className = "btn btn-red";
+            }
         });
-        function startRecording() {
-            isRecording = true;
-            sessionData = [CSV_HEADER];
-            document.getElementById('recordBtn').innerText = "Stop & Save CSV";
-            document.getElementById('recordBtn').className = "btn btn-red";
-        }
-        function stopRecording() {
-            isRecording = false;
-            document.getElementById('recordBtn').innerText = "Start Session";
-            document.getElementById('recordBtn').className = "btn btn-green";
-            triggerDownload(sessionData.join('\n'));
-        }
         
-        document.getElementById('testDownloadBtn').addEventListener('click', () => {
-            triggerDownload(CSV_HEADER + '\n2026-03-30T14:00:00Z,0,0,0,0,0,0,0,0,0,0');
+        document.getElementById('sendConfigBtn').addEventListener('click', async () => {
+            if (!bleRxCharacteristic) return;
+            const command = `SET:${document.getElementById('configParam').value}:${document.getElementById('configValue').value}\n`; 
+            try {
+                await bleRxCharacteristic.writeValue(new TextEncoder().encode(command));
+                document.getElementById('configStatus').innerText = `Sent: ${command.trim()}`;
+            } catch (err) { document.getElementById('configStatus').innerText = "Failed: " + err.message; }
         });
-
-        function triggerDownload(csvContent) {
-            const a = document.createElement('a');
-            a.href = URL.createObjectURL(new Blob([csvContent], { type: 'text/csv' }));
-            a.download = `impulse_session_${new Date().getTime()}.csv`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-        }
     </script>
 </body>
 </html>
