@@ -192,37 +192,108 @@
                 const txChar = await service.getCharacteristic(TX_CHAR_UUID);
                 await txChar.startNotifications();
                 
-txChar.addEventListener('characteristicvaluechanged', (e) => {
-    const value = e.target.value;
-    
-    // 1. Safely extract raw bytes (Bypasses Bluefy TextDecoder bugs)
-    let rawHex = "";
-    let safeAscii = "";
-    for (let i = 0; i < value.byteLength; i++) {
-        let byte = value.getUint8(i);
-        rawHex += byte.toString(16).padStart(2, '0') + " ";
-        // Only convert printable ASCII characters to text, otherwise show a dot
-        safeAscii += (byte >= 32 && byte <= 126) ? String.fromCharCode(byte) : ".";
-    }
+// Get TX (Read/Notify)
+                const txChar = await service.getCharacteristic(TX_CHAR_UUID);
+                await txChar.startNotifications();
+                
+                txChar.addEventListener('characteristicvaluechanged', (e) => {
+                    const data = e.target.value; // This is a DataView object
+                    if (data.byteLength < 1) return;
 
-    // Print what we found to the green debug box!
-    document.getElementById('debugRaw').innerText = `HEX: ${rawHex} | TXT: ${safeAscii}`;
+                    const pktType = data.getUint8(0);
 
-    // 2. Add to our buffer using the safe ASCII text
-    dataBuffer += safeAscii;
-    let lines = dataBuffer.split('\n');
-    
-    if (lines.length > 1) {
-        dataBuffer = lines.pop(); 
-        for (let line of lines) {
-            let cleanLine = line.trim();
-            if(cleanLine.length > 0 && cleanLine.includes(',')) {
-                parseFirmwareLine(cleanLine);
-            }
-        }
-        liveChart.update();
-    }
-});
+                    // If it's ASCII text (like configuration replies)
+                    if (pktType < 0xB0) {
+                        const text = new TextDecoder().decode(data.buffer);
+                        document.getElementById('debugRaw').innerText = "TXT: " + text.trim();
+                        return;
+                    }
+
+                    // --- BINARY PACKET DECODING ---
+                    // 0xB3 = Session End
+                    if (pktType === 0xB3) {
+                        stopRecording(); // Trigger the CSV download
+                        return;
+                    }
+
+                    // 0xB1 (Live) or 0xB2 (Session Upload)
+                    if (data.byteLength < 3) return;
+                    const count = data.getUint16(1, true); // true = little-endian
+                    if (data.byteLength < 3 + (count * 24)) return;
+
+                    // Sensitivities (Ported exactly from ble_worker.py)
+                    const xl_scale = 0.122 * 1e-3;
+                    const gy_scale = 140.0 * 1e-3;
+                    const hg_s = 0.001953;
+
+                    let offset = 3;
+                    for (let i = 0; i < count; i++) {
+                        // Unpack '<I10h' (1 uint32 + 10 int16)
+                        const ts_us = data.getUint32(offset, true); offset += 4;
+                        const ax_r = data.getInt16(offset, true); offset += 2;
+                        const ay_r = data.getInt16(offset, true); offset += 2;
+                        const az_r = data.getInt16(offset, true); offset += 2;
+                        const gx_r = data.getInt16(offset, true); offset += 2;
+                        const gy_r = data.getInt16(offset, true); offset += 2;
+                        const gz_r = data.getInt16(offset, true); offset += 2;
+                        const hx_r = data.getInt16(offset, true); offset += 2;
+                        const hy_r = data.getInt16(offset, true); offset += 2;
+                        const hz_r = data.getInt16(offset, true); offset += 2;
+                        const temp_r = data.getInt16(offset, true); offset += 2;
+
+                        // Convert back to physical units
+                        const ax = ax_r * xl_scale;
+                        const ay = ay_r * xl_scale;
+                        const az = az_r * xl_scale;
+                        const gx = gx_r * gy_scale;
+                        const gy = gy_r * gy_scale;
+                        const gz = gz_r * gy_scale;
+                        const hx = hx_r * hg_s;
+                        const hy = hy_r * hg_s;
+                        const hz = hz_r * hg_s;
+                        const temp = 25.0 + temp_r / 256.0;
+
+                        // Session Recording
+                        if (isRecording) {
+                            sessionData.push(`${new Date().toISOString()},${gx},${gy},${gz},${hx},${hy},${hz},${ax},${ay},${az},${temp}`);
+                            document.getElementById('val_rows').innerText = sessionData.length - 1;
+                        }
+
+                        // Update Math & UI (Only on the last sample in the batch to save CPU)
+                        if (i === count - 1) {
+                            let peak_g = Math.max(Math.abs(hx), Math.abs(hy), Math.abs(hz));
+                            
+                            // Debugger output
+                            document.getElementById('debugRaw').innerText = `BIN: ${peak_g.toFixed(2)}G | ${temp.toFixed(1)}°C`;
+
+                            // Alerts
+                            if (peak_g >= 15.0 && pktType === 0xB1) {
+                                let sev = peak_g >= 25.0 ? 'crit' : 'warn';
+                                let msg = peak_g >= 25.0 ? 'Critical impact' : 'High impact';
+                                let ts = new Date().toLocaleTimeString([], {hour12: false});
+                                const feed = document.getElementById('alertFeed');
+                                if (feed.innerText.includes("No alerts yet")) feed.innerHTML = '';
+                                feed.innerHTML = `<div class="alert-item alert-${sev}"><span>${msg}: ${peak_g.toFixed(1)} G</span><span>${ts}</span></div>` + feed.innerHTML;
+                            }
+
+                            // 3D Math
+                            let now = performance.now();
+                            let dt = (now - lastTime) / 1000.0;
+                            lastTime = now;
+                            ahrs.update(gx * (Math.PI/180), gy * (Math.PI/180), gz * (Math.PI/180), ax, ay, az, dt);
+                            
+                            let euler = ahrs.getEulerAngles();
+                            document.getElementById('sensorBox').style.transform = `rotateX(${-euler.pitch * 180/Math.PI}deg) rotateY(${euler.yaw * 180/Math.PI}deg) rotateZ(${euler.roll * 180/Math.PI}deg)`;
+
+                            // Visuals
+                            document.getElementById('val_hx').innerText = peak_g.toFixed(1);
+                            document.getElementById('val_temp').innerText = temp.toFixed(1);
+
+                            liveChart.data.datasets[0].data.push(hx); liveChart.data.datasets[0].data.shift();
+                            liveChart.update();
+                        }
+                    }
+                });
 
                 bleRxCharacteristic = await service.getCharacteristic(RX_CHAR_UUID);
                 document.getElementById('status').innerText = "Status: Connected & Streaming";
@@ -235,56 +306,7 @@ txChar.addEventListener('characteristicvaluechanged', (e) => {
         });
 
         // --- FIX #2: Auto-Aligning Data Parser ---
-        function parseFirmwareLine(line) {
-            const parts = line.split(',');
-            if (parts.length < 10) return; // Not enough data points
 
-            // By reading backwards, we ignore headers, prefixes, or timestamps at the front!
-            const temp = parseFloat(parts[parts.length - 1]);
-            const az = parseFloat(parts[parts.length - 2]);
-            const ay = parseFloat(parts[parts.length - 3]);
-            const ax = parseFloat(parts[parts.length - 4]);
-            const hz = parseFloat(parts[parts.length - 5]);
-            const hy = parseFloat(parts[parts.length - 6]);
-            const hx = parseFloat(parts[parts.length - 7]);
-            const gz = parseFloat(parts[parts.length - 8]);
-            const gy = parseFloat(parts[parts.length - 9]);
-            const gx = parseFloat(parts[parts.length - 10]);
-
-            // If it grabbed a non-number (like a header string), drop it
-            if (isNaN(gx) || isNaN(hx) || isNaN(ax)) return;
-
-            if (isRecording) {
-                sessionData.push(`${new Date().toISOString()},${gx},${gy},${gz},${hx},${hy},${hz},${ax},${ay},${az},${temp}`);
-                document.getElementById('val_rows').innerText = sessionData.length - 1;
-            }
-
-            // Alerts
-            let peak_g = Math.max(Math.abs(hx), Math.abs(hy), Math.abs(hz));
-            if (peak_g >= 15.0) {
-                let sev = peak_g >= 25.0 ? 'crit' : 'warn';
-                let msg = peak_g >= 25.0 ? 'Critical impact' : 'High impact';
-                let ts = new Date().toLocaleTimeString([], {hour12: false});
-                const feed = document.getElementById('alertFeed');
-                if (feed.innerText.includes("No alerts yet")) feed.innerHTML = '';
-                feed.innerHTML = `<div class="alert-item alert-${sev}"><span>${msg}: ${peak_g.toFixed(1)} G</span><span>${ts}</span></div>` + feed.innerHTML;
-            }
-
-            // 3D Math
-            let now = performance.now();
-            let dt = (now - lastTime) / 1000.0;
-            lastTime = now;
-            ahrs.update(gx * (Math.PI/180), gy * (Math.PI/180), gz * (Math.PI/180), ax, ay, az, dt);
-            
-            let euler = ahrs.getEulerAngles();
-            document.getElementById('sensorBox').style.transform = `rotateX(${-euler.pitch * 180/Math.PI}deg) rotateY(${euler.yaw * 180/Math.PI}deg) rotateZ(${euler.roll * 180/Math.PI}deg)`;
-
-            // UI
-            document.getElementById('val_hx').innerText = peak_g.toFixed(1);
-            document.getElementById('val_temp').innerText = temp.toFixed(1);
-
-            liveChart.data.datasets[0].data.push(hx); liveChart.data.datasets[0].data.shift();
-        }
 
         // --- Recording & Settings ---
         document.getElementById('recordBtn').addEventListener('click', () => {
